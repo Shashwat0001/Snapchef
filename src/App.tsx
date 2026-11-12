@@ -125,7 +125,7 @@ export default function App() {
     setStatusToast(msg);
     window.setTimeout(() => {
       setStatusToast((prev) => (prev === msg ? null : prev));
-    }, 4500);
+    }, 5000);
   };
 
   const scrollToSection = (section: ActiveSection) => {
@@ -150,13 +150,16 @@ export default function App() {
   ) => {
     const nextInv =
       mode === 'merge'
-        ? mergeScannedInventory(inventory, payload.inventory)
+        ? mergeScannedInventory(itemOrEmpty(payload.inventory), inventory)
         : payload.inventory;
 
     setInventory(nextInv);
-    if (nextInv.length > 0) {
+    if (payload.inventory.length > 0) {
+      setSelectedCodexItem(payload.inventory[0]);
+    } else if (nextInv.length > 0) {
       setSelectedCodexItem(nextInv[0]);
     }
+
     if (payload.recipes.length > 0) {
       setRecipes(payload.recipes);
       setActiveCraftingRecipe(payload.recipes[0]);
@@ -164,21 +167,27 @@ export default function App() {
     showToast(
       `${sourceLabel}: Cataloged ${nextInv.length} ingredients & ${
         payload.recipes.length || recipes.length
-      } global dishes.`
+      } delicious global dishes!`
     );
   };
+
+  function itemOrEmpty(items: InventoryItem[]): InventoryItem[] {
+    return Array.isArray(items) ? items : [];
+  }
 
   const handleAddSingleIngredient = (
     item: InventoryItem,
     newRecipes?: RecipeItem[]
   ) => {
-    const merged = mergeScannedInventory(inventory, [item]);
+    const merged = mergeScannedInventory([item], inventory);
     setInventory(merged);
     setSelectedCodexItem(item);
     if (newRecipes && newRecipes.length > 0) {
       setRecipes((prev) => [...newRecipes, ...prev]);
     }
-    showToast(`Added "${item.name}" to your virtual pantry and opened its Codex.`);
+    showToast(
+      `Added "${item.name}" to your kitchen basket and opened its Nutritional Codex!`
+    );
   };
 
   const handleUpdateQuantity = (id: string, deltaGrams: number) => {
@@ -236,7 +245,7 @@ export default function App() {
 
     setCraftedHistory((prev) => [newLog, ...prev]);
     showToast(
-      `Completed "${recipe.title}"! Deducted used ingredients from virtual pantry.`
+      `Completed "${recipe.title}"! Deducted used ingredients from your kitchen basket.`
     );
   };
 
@@ -255,27 +264,58 @@ export default function App() {
   const totals = calculatePantryTotals(inventory);
 
   return (
-    <div id="top" className="min-h-screen bg-[#0D0D0D] text-[#F2F5F8] pb-24 md:pb-16">
+    <div
+      id="top"
+      className="min-h-screen bg-gradient-to-br from-[#FFFDF9] via-[#FFF7ED] to-[#F0FDFA] text-slate-900 pb-24 md:pb-16"
+    >
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-40 h-14 flex items-center justify-between gap-8 px-4 sm:px-8 bg-[#0D0D0D]/90 backdrop-blur-md border-b border-white/10">
-        {/* Zone 1: Single text element wordmark */}
+      <header className="sticky top-0 z-40 h-16 flex items-center justify-between gap-8 px-4 sm:px-8 bg-white/90 backdrop-blur-md border-b border-orange-200/80 shadow-sm">
+        {/* Zone 1: Animated Neon-Outlined SnapChef Brand Wordmark */}
         <a
           href="#top"
-          className="text-lg sm:text-xl font-bold tracking-tight text-[#F2F5F8] whitespace-nowrap shrink-0"
+          className="relative inline-flex items-center justify-center px-4 py-1.5 rounded-xl bg-slate-950 whitespace-nowrap shrink-0 shadow-md overflow-hidden"
         >
-          SnapChef
+          <svg
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 160 44"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <linearGradient id="snapchef-neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#00F5D4" />
+                <stop offset="35%" stopColor="#FF2E93" />
+                <stop offset="70%" stopColor="#FFB800" />
+                <stop offset="100%" stopColor="#00F5D4" />
+              </linearGradient>
+            </defs>
+            <rect
+              x="2"
+              y="2"
+              width="156"
+              height="40"
+              rx="10"
+              fill="none"
+              stroke="url(#snapchef-neon-grad)"
+              strokeWidth="2.5"
+              className="snapchef-neon-rect"
+            />
+          </svg>
+          <span className="snapchef-neon-text text-xl sm:text-2xl font-extrabold tracking-wider relative z-10">
+            SnapChef
+          </span>
         </a>
 
-        {/* Zone 2: 4 concise single-line text navigation links */}
+        {/* Zone 2: 5 concise single-line text navigation links */}
         <nav
           aria-label="Primary Navigation"
-          className="hidden md:flex items-center gap-6 text-sm font-medium text-[#94A3B8]"
+          className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-600"
         >
           <button
             type="button"
             onClick={() => scrollToSection('scanner')}
-            className={`hover:text-[#00F0FF] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'scanner' ? 'text-[#00F0FF]' : ''
+            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeNav === 'scanner' ? 'text-[#FF5A1F]' : ''
             }`}
           >
             Scanner
@@ -283,8 +323,8 @@ export default function App() {
           <button
             type="button"
             onClick={() => scrollToSection('codex')}
-            className={`hover:text-[#00F0FF] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'codex' ? 'text-[#00F0FF]' : ''
+            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeNav === 'codex' ? 'text-[#FF5A1F]' : ''
             }`}
           >
             Ingredient Codex
@@ -292,8 +332,8 @@ export default function App() {
           <button
             type="button"
             onClick={() => scrollToSection('recipes')}
-            className={`hover:text-[#00F0FF] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'recipes' ? 'text-[#00F0FF]' : ''
+            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeNav === 'recipes' ? 'text-[#FF5A1F]' : ''
             }`}
           >
             Recipe Synthesizer
@@ -301,17 +341,17 @@ export default function App() {
           <button
             type="button"
             onClick={() => scrollToSection('crafting')}
-            className={`hover:text-[#00F0FF] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'crafting' ? 'text-[#00F0FF]' : ''
+            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeNav === 'crafting' ? 'text-[#FF5A1F]' : ''
             }`}
           >
-            Crafting HUD
+            Cooking Studio
           </button>
           <button
             type="button"
             onClick={() => scrollToSection('macros')}
-            className={`hover:text-[#00F0FF] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'macros' ? 'text-[#00F0FF]' : ''
+            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+              activeNav === 'macros' ? 'text-[#FF5A1F]' : ''
             }`}
           >
             Macro Log
@@ -324,43 +364,49 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Responsive Container (max-w-7xl on 1440px desktop, fluid on mobile/tablet) */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-8">
-        {/* Compact Hero Header & Quantitative HUD Strip */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pb-6 border-b border-white/10">
+      {/* Main Responsive Container */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+        {/* Vibrant Hero Header & Quantitative Strip */}
+        <div className="rounded-3xl border-2 border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50/70 to-teal-50/80 p-5 sm:p-7 flex flex-col lg:flex-row lg:items-end justify-between gap-4 shadow-sm">
           <div className="max-w-2xl">
-            <p className="text-xs font-medium text-[#00F0FF]">
-              AI Kitchen Inventory & Global Recipe Synthesizer · Powered by Google Argon
+            <p className="text-xs font-extrabold text-[#FF5A1F]">
+              Joyful AI Kitchen Companion · Point Your Camera & Cook Happy
             </p>
-            <h1 className="text-2xl sm:text-4xl font-bold text-[#F2F5F8] tracking-tight mt-1 text-balance">
-              Scan Your Fridge. Inspect Nutrition. Craft Zero-Missing-Ingredient Meals.
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1 text-balance">
+              Snap Any Ingredient. Discover Its Nutrition. Cook Joyful Global Meals.
             </h1>
           </div>
 
           {/* Unboxed Quantitative Telemetry Summary */}
-          <div className="flex flex-wrap items-center gap-4 text-xs font-mono tabular-nums text-[#94A3B8]">
+          <div className="flex flex-wrap items-center gap-3.5 text-xs font-mono font-bold tabular-nums text-slate-700">
             <span>
-              Pantry:{' '}
-              <strong className="text-[#F2F5F8]">{totals.totalItems} Items</strong>
+              Kitchen:{' '}
+              <strong className="text-slate-950">{totals.totalItems} Items</strong>
             </span>
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true" className="text-orange-300">
+              ·
+            </span>
             <span>
               Energy:{' '}
-              <strong className="text-[#00F0FF]">
+              <strong className="text-[#EA580C]">
                 {totals.totalCalories} kcal
               </strong>
             </span>
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true" className="text-orange-300">
+              ·
+            </span>
             <span>
               Protein:{' '}
-              <strong className="text-[#B8FF01]">
+              <strong className="text-emerald-700">
                 {totals.totalProteinG}g
               </strong>
             </span>
-            <span aria-hidden="true">·</span>
+            <span aria-hidden="true" className="text-orange-300">
+              ·
+            </span>
             <span>
               Recipes Ready:{' '}
-              <strong className="text-[#FF2A85]">{recipes.length}</strong>
+              <strong className="text-rose-600">{recipes.length}</strong>
             </span>
           </div>
         </div>
@@ -369,21 +415,30 @@ export default function App() {
         {statusToast && (
           <div
             role="status"
-            className="mt-4 rounded-xl border border-[#00F0FF]/40 bg-[#141619] px-4 py-3 text-xs sm:text-sm text-[#00F0FF] flex items-center justify-between gap-3"
+            className="mt-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-bold text-emerald-900 flex flex-wrap items-center justify-between gap-3 shadow-md"
           >
             <span>{statusToast}</span>
-            <button
-              type="button"
-              onClick={() => setStatusToast(null)}
-              className="text-xs text-[#94A3B8] hover:text-white cursor-pointer"
-            >
-              Close
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => scrollToSection('codex')}
+                className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
+              >
+                View Scanned Item
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusToast(null)}
+                className="text-xs text-emerald-700 hover:text-emerald-950 cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
 
         {/* Section 1: Browser-Native Camera Scanner ("The Eye") */}
-        <div ref={scannerRef} className="scroll-mt-16 mt-6">
+        <div ref={scannerRef} className="scroll-mt-20 mt-6">
           <CameraScannerEye
             onScanComplete={handleScanComplete}
             onAddSingleIngredient={handleAddSingleIngredient}
@@ -393,7 +448,7 @@ export default function App() {
         </div>
 
         {/* Section 2: Interactive Inventory Loot Grid & Deep Ingredient Codex */}
-        <div ref={codexRef} className="scroll-mt-16">
+        <div ref={codexRef} className="scroll-mt-20">
           <InventoryLootGrid
             inventory={inventory}
             selectedItem={selectedCodexItem}
@@ -404,8 +459,8 @@ export default function App() {
           />
         </div>
 
-        {/* Section 3: Global Recipe Synthesizer (Powered by Argon) */}
-        <div ref={recipesRef} className="scroll-mt-16">
+        {/* Section 3: Global Recipe Synthesizer */}
+        <div ref={recipesRef} className="scroll-mt-20">
           <RecipeSynthesizer
             recipes={recipes}
             inventory={inventory}
@@ -416,8 +471,8 @@ export default function App() {
           />
         </div>
 
-        {/* Section 4: RPG-Style "Crafting" Mode (Interactive Cook View) */}
-        <div ref={craftingRef} className="scroll-mt-16">
+        {/* Section 4: Interactive Cooking Studio (Crafting Mode HUD) */}
+        <div ref={craftingRef} className="scroll-mt-20">
           <CraftingModeHUD
             recipe={activeCraftingRecipe}
             onCompleteCrafting={handleCompleteCrafting}
@@ -426,7 +481,7 @@ export default function App() {
         </div>
 
         {/* Section 5: Pantry Telemetry, Crafted Meal History & PWA Install */}
-        <div ref={macrosRef} className="scroll-mt-16">
+        <div ref={macrosRef} className="scroll-mt-20">
           <NutritionLogSection
             inventory={inventory}
             craftedHistory={craftedHistory}
@@ -436,15 +491,15 @@ export default function App() {
       </main>
 
       {/* Quiet Footer */}
-      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#94A3B8]">
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14 pt-6 border-t border-orange-200/70 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-600">
         <p>
-          SnapChef — AI Kitchen Inventory & Global Recipe Synthesizer · Built for Mobile & Desktop
+          SnapChef — Joyful AI Kitchen Inventory & Global Recipe Synthesizer · Built for Mobile & Desktop
         </p>
         <div className="flex items-center gap-4">
           <button
             type="button"
             onClick={() => scrollToSection('scanner')}
-            className="hover:text-white cursor-pointer"
+            className="hover:text-[#FF5A1F] cursor-pointer"
           >
             Camera Scanner
           </button>
@@ -452,7 +507,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => scrollToSection('recipes')}
-            className="hover:text-white cursor-pointer"
+            className="hover:text-[#FF5A1F] cursor-pointer"
           >
             Global Recipes
           </button>
@@ -460,7 +515,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleResetDemoData}
-            className="hover:text-white cursor-pointer"
+            className="hover:text-[#FF5A1F] cursor-pointer"
           >
             Reset Pantry
           </button>
@@ -473,61 +528,61 @@ export default function App() {
       {/* Mobile Bottom Navigation Bar (Android / iPhone Thumb Zone, <= 15% total sticky cap) */}
       <nav
         aria-label="Mobile Bottom Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0D0D0D]/95 backdrop-blur-md border-t border-white/10 grid grid-cols-5 items-center h-14 pb-safe px-1"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-orange-200 grid grid-cols-5 items-center h-14 pb-safe px-1 shadow-lg"
       >
         <button
           type="button"
           onClick={() => scrollToSection('scanner')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'scanner' ? 'text-[#00F0FF]' : 'text-[#94A3B8]'
+            activeNav === 'scanner' ? 'text-[#FF5A1F] font-bold' : 'text-slate-500'
           }`}
         >
           <Camera className="w-4 h-4" />
-          <span className="text-[10px] font-medium mt-0.5">Scan</span>
+          <span className="text-[10px] mt-0.5">Scan</span>
         </button>
 
         <button
           type="button"
           onClick={() => scrollToSection('codex')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'codex' ? 'text-[#00F0FF]' : 'text-[#94A3B8]'
+            activeNav === 'codex' ? 'text-emerald-600 font-bold' : 'text-slate-500'
           }`}
         >
           <BookOpen className="w-4 h-4" />
-          <span className="text-[10px] font-medium mt-0.5">Codex</span>
+          <span className="text-[10px] mt-0.5">Codex</span>
         </button>
 
         <button
           type="button"
           onClick={() => scrollToSection('recipes')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'recipes' ? 'text-[#00F0FF]' : 'text-[#94A3B8]'
+            activeNav === 'recipes' ? 'text-[#FF5A1F] font-bold' : 'text-slate-500'
           }`}
         >
           <ChefHat className="w-4 h-4" />
-          <span className="text-[10px] font-medium mt-0.5">Recipes</span>
+          <span className="text-[10px] mt-0.5">Recipes</span>
         </button>
 
         <button
           type="button"
           onClick={() => scrollToSection('crafting')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'crafting' ? 'text-[#B8FF01]' : 'text-[#94A3B8]'
+            activeNav === 'crafting' ? 'text-rose-600 font-bold' : 'text-slate-500'
           }`}
         >
           <Flame className="w-4 h-4" />
-          <span className="text-[10px] font-medium mt-0.5">Craft</span>
+          <span className="text-[10px] mt-0.5">Cook</span>
         </button>
 
         <button
           type="button"
           onClick={() => scrollToSection('macros')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'macros' ? 'text-[#00F0FF]' : 'text-[#94A3B8]'
+            activeNav === 'macros' ? 'text-teal-600 font-bold' : 'text-slate-500'
           }`}
         >
           <Activity className="w-4 h-4" />
-          <span className="text-[10px] font-medium mt-0.5">Macros</span>
+          <span className="text-[10px] mt-0.5">Macros</span>
         </button>
       </nav>
     </div>

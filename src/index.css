@@ -10,8 +10,8 @@
 
   body {
     font-family: var(--font-sans);
-    background-color: #0D0D0D;
-    color: #F2F5F8;
+    background-color: #FFFDF9;
+    color: #0F172A;
     overflow-x: hidden;
   }
 
@@ -35,14 +35,63 @@
 
 @keyframes scanline {
   0% {
-    transform: translateY(-100%);
+    transform: translateY(-20%);
+  }
+  50% {
+    transform: translateY(280%);
   }
   100% {
-    transform: translateY(400%);
+    transform: translateY(-20%);
   }
 }
 
 .animate-scanline {
-  animation: scanline 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: scanline 2.2s ease-in-out infinite;
 }
+
+@keyframes neonLogoOutline {
+  0%, 100% {
+    text-shadow:
+      0 0 6px rgba(0, 245, 212, 0.95),
+      0 0 14px rgba(0, 245, 212, 0.65),
+      0 0 26px rgba(255, 46, 147, 0.55);
+    filter: drop-shadow(0 0 4px rgba(0, 245, 212, 0.45));
+  }
+  33% {
+    text-shadow:
+      0 0 6px rgba(255, 46, 147, 0.95),
+      0 0 14px rgba(255, 184, 0, 0.75),
+      0 0 26px rgba(139, 92, 246, 0.65);
+    filter: drop-shadow(0 0 4px rgba(255, 46, 147, 0.45));
+  }
+  66% {
+    text-shadow:
+      0 0 6px rgba(255, 184, 0, 0.95),
+      0 0 14px rgba(16, 185, 129, 0.75),
+      0 0 26px rgba(0, 245, 212, 0.65);
+    filter: drop-shadow(0 0 4px rgba(255, 184, 0, 0.45));
+  }
+}
+
+@keyframes neonDashTrace {
+  0% {
+    stroke-dashoffset: 360;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.snapchef-neon-text {
+  font-family: var(--font-display);
+  color: #FFFFFF;
+  -webkit-text-stroke: 1px rgba(0, 245, 212, 0.85);
+  animation: neonLogoOutline 4.5s ease-in-out infinite;
+}
+
+.snapchef-neon-rect {
+  stroke-dasharray: 90 90;
+  animation: neonDashTrace 3.6s linear infinite;
+}
+
 

@@ -195,15 +195,12 @@ const SNAPCHEF_RESPONSE_SCHEMA = {
   required: ['inventory', 'recipes'],
 };
 
-const SYSTEM_INSTRUCTION = `You are SnapChef, an advanced AI Kitchen Inventory & Global Recipe Synthesizer powered by Google Argon culinary & spatial reasoning.
+const SYSTEM_INSTRUCTION = `You are SnapChef, an AI Kitchen Inventory & Global Recipe Synthesizer.
 Your mission:
-1. Identify all visible or specified perishables, vegetables, proteins, dairy, legumes, grains, and spices.
-2. For each ingredient, provide an exact nutritional breakdown per 100g (calories_per_100g, protein_g, carbs_g, fat_g), 3 specific physiological/micronutrient health_benefits, and a rich botanical/culinary source_details profile.
-3. Cross-reference ONLY the available ingredients (plus basic water/salt/cooking oil) using strict Zero-Missing-Ingredient Logic to synthesize practical, authentic everyday dishes across diverse global cuisines:
-   - Indian Cuisine (e.g., Poha, Aloo Jeera, Sabzis, Dals, Parathas, Paneer Bhurji, quick home-style curries)
-   - European Cuisine (e.g., Rustic pastas, Mediterranean bowls, frittatas, Spanish tortillas)
-   - South American Cuisine (e.g., Arepas, quick bean stews, fresh ceviche-style preparations)
-4. Categorize each recipe clearly into Breakfast, Lunch, or Dinner, assign a gamified crafting_difficulty ("Level 1" to "Level 5"), and break instructions into focused flashcards with accurate timer_seconds for any boiling, sautéing, simmering, or resting step.
+1. Examine the camera capture or ingredient list and identify the exact food item(s), produce, packaged food, beverage, protein, grain, or spice that the camera lens is focusing on.
+2. For each detected item, provide an accurate nutritional breakdown per 100g (calories_per_100g, protein_g, carbs_g, fat_g), 3 specific physiological/micronutrient health_benefits, and a rich botanical or culinary source_details profile.
+3. Synthesize practical, authentic everyday dishes across global cuisines (Indian, European, South American, and Global) centered on the exact scanned item(s) plus basic pantry staples (water, salt, oil, basic aromatics).
+4. Categorize each recipe into Breakfast, Lunch, or Dinner, assign a crafting_difficulty ("Level 1" to "Level 5"), and break instructions into focused flashcards with accurate timer_seconds for cooking steps.
 Always respond with valid JSON matching the requested schema.`;
 
 async function callGeminiWithFallback(
@@ -211,30 +208,36 @@ async function callGeminiWithFallback(
   schema = SNAPCHEF_RESPONSE_SCHEMA
 ): Promise<{ text: string; modelUsed: string }> {
   const ai = getGenAIClient();
-  const modelsToTry = ['gemini-4-argon', 'gemini-3.8-flash'];
+  const modelsToTry: Array<{
+    name: string;
+    thinkingLevel?: ThinkingLevel;
+  }> = [
+    { name: 'gemini-3.1-flash-lite' },
+    { name: 'gemini-3.8-flash', thinkingLevel: ThinkingLevel.LOW },
+    { name: 'gemini-4-argon', thinkingLevel: ThinkingLevel.MEDIUM },
+  ];
   let lastError: unknown = null;
 
-  for (const modelName of modelsToTry) {
+  for (const modelSpec of modelsToTry) {
     try {
       const response = await ai.models.generateContent({
-        model: modelName,
+        model: modelSpec.name,
         contents: contents as Parameters<typeof ai.models.generateContent>[0]['contents'],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           responseMimeType: 'application/json',
           responseSchema: schema,
-          thinkingConfig: {
-            thinkingLevel: ThinkingLevel.HIGH,
-          },
+          ...(modelSpec.thinkingLevel
+            ? { thinkingConfig: { thinkingLevel: modelSpec.thinkingLevel } }
+            : {}),
         },
       });
 
       if (response.text) {
-        return { text: response.text, modelUsed: modelName };
+        return { text: response.text, modelUsed: modelSpec.name };
       }
     } catch (err) {
       lastError = err;
-      // Continue to fallback model if first model fails due to key tier or availability
     }
   }
 
@@ -251,7 +254,12 @@ async function startServer() {
 
   app.post('/api/scan-image', async (req: Request, res: Response) => {
     try {
-      const { imageBase64, mimeType = 'image/jpeg', mealIntent = 'All' } = req.body || {};
+      const {
+        imageBase64,
+        mimeType = 'image/jpeg',
+        mealIntent = 'All',
+        isSimulatedFallback = false,
+      } = req.body || {};
       if (!imageBase64 || typeof imageBase64 !== 'string') {
         res.status(400).json({ error: 'Missing imageBase64 payload for camera scan.' });
         return;
@@ -259,12 +267,15 @@ async function startServer() {
 
       const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
 
-      const promptText = `Perform a high-definition physical ingredient mapping of this kitchen/fridge/pantry capture.
-Catalog every visible vegetable, protein, dairy item, legume, grain, or spice into the 'inventory' array with accurate per-100g macros, health benefits, and botanical/culinary source details.
-If the image shows a non-kitchen scene or unclear items, still extract any recognizable food items or provide a representative starter kitchen scan (including Potato, Fresh Paneer, Eggs, Spinach, Chickpeas, Tomatoes, and Cumin spices) so the user can test the full workflow.
-Then synthesize 6 zero-missing-ingredient recipes across Indian, European, and South American cuisines (covering Breakfast, Lunch, and Dinner${
-        mealIntent !== 'All' ? `, prioritizing ${mealIntent}` : ''
-      }) using only those ingredients.`;
+      const promptText = isSimulatedFallback
+        ? `Analyze this simulated kitchen shelf image and extract the listed ingredients (Potato, Fresh Paneer, Eggs, Baby Spinach, Chickpeas, Vine Tomatoes) into the 'inventory' array with complete 100g macros, health benefits, and source details, plus 6 recipes across Indian, European, and South American cuisines.`
+        : `Look closely at what the user's camera lens is focusing on in this photo.
+Identify EVERY real food item, fruit, vegetable, dairy product, meat/egg, grain, spice, beverage, packaged food, or cooked dish visible in the camera frame (even if the user is holding just 1 single item in front of the camera lens).
+- Populate 'inventory' ONLY with the actual item(s) visible in this photo, including accurate calories_per_100g, macros (protein_g, carbs_g, fat_g), 3 specific health_benefits, and botanical/culinary source_details.
+- If the camera is pointed at a non-food object (e.g. a person, desk, or wall with no food visible), set 'scan_summary' to a friendly message describing what the camera saw and asking the user to hold an ingredient or food item in the reticle, and return the closest recognizable item or empty inventory.
+- Synthesize 4 delicious, practical recipes across Indian, European, and South American cuisines (covering Breakfast, Lunch, and Dinner${
+            mealIntent !== 'All' ? `, prioritizing ${mealIntent}` : ''
+          }) that use the exact scanned item(s) as the hero ingredient!`;
 
       const { text, modelUsed } = await callGeminiWithFallback({
         parts: [

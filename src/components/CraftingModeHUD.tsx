@@ -23,9 +23,6 @@ interface CraftingModeHUDProps {
   onBackToRecipes: () => void;
 }
 
-/**
- * Plays a crisp cyberpunk HUD completion chime using the browser's native Web Audio API.
- */
 function playTimerAlertChime() {
   try {
     const AudioCtx =
@@ -34,7 +31,7 @@ function playTimerAlertChime() {
         .webkitAudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
-    const frequencies = [587.33, 880, 1174.66]; // D5, A5, D6 chord arpeggio
+    const frequencies = [587.33, 880, 1174.66];
     frequencies.forEach((freq, idx) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -71,7 +68,6 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
   const [dishCompletedBanner, setDishCompletedBanner] =
     useState<boolean>(false);
 
-  // Per-step countdown timers state: remaining seconds & running boolean
   const [timersRemaining, setTimersRemaining] = useState<Record<number, number>>(
     () => {
       const initial: Record<number, number> = {};
@@ -85,7 +81,6 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
     {}
   );
 
-  // Reset state if recipe changes
   useEffect(() => {
     setActiveStepIndex(0);
     setCompletedSteps({});
@@ -98,7 +93,6 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
     setTimersRunning({});
   }, [recipe]);
 
-  // Global 1-second tick for any active countdown timers
   useEffect(() => {
     const anyRunning = Object.values(timersRunning).some(Boolean);
     if (!anyRunning) return;
@@ -186,16 +180,16 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
   return (
     <section
       aria-label="Interactive Crafting Mode Cook View"
-      className="mt-6 rounded-2xl border border-[#00F0FF]/40 bg-[#141619] p-4 sm:p-6 shadow-2xl"
+      className="mt-8 rounded-3xl border-2 border-rose-200 bg-gradient-to-br from-white via-orange-50/40 to-rose-50/40 p-4 sm:p-6 shadow-xl shadow-rose-500/5"
     >
       {/* Top Bar: Back Button + Recipe Meta + View Mode Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-rose-200/70">
         <button
           type="button"
           onClick={onBackToRecipes}
-          className="min-h-[44px] px-3.5 py-2 rounded-xl border border-white/15 bg-[#0D0D0D] text-xs font-medium text-[#F2F5F8] hover:border-[#00F0FF] transition-colors flex items-center gap-1.5 cursor-pointer"
+          className="min-h-[44px] px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-800 hover:border-[#FF5A1F] transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
         >
-          <ChevronLeft className="w-4 h-4 text-[#00F0FF]" />
+          <ChevronLeft className="w-4 h-4 text-[#FF5A1F]" />
           <span>Back to Recipes</span>
         </button>
 
@@ -203,33 +197,33 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
           <button
             type="button"
             onClick={() => setSoundEnabled((s) => !s)}
-            className="min-h-[44px] px-3 py-2 rounded-xl border border-white/10 bg-[#0D0D0D] text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 cursor-pointer"
+            className="min-h-[44px] px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:text-slate-950 flex items-center gap-1.5 cursor-pointer shadow-sm"
             aria-label={
               soundEnabled ? 'Mute timer audio alert' : 'Unmute timer audio alert'
             }
           >
             {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-[#B8FF01]" />
+              <Volume2 className="w-4 h-4 text-emerald-600" />
             ) : (
-              <VolumeX className="w-4 h-4 text-[#94A3B8]" />
+              <VolumeX className="w-4 h-4 text-slate-400" />
             )}
             <span className="hidden sm:inline">
-              {soundEnabled ? 'Audio Alert On' : 'Muted'}
+              {soundEnabled ? 'Timer Chime On' : 'Muted'}
             </span>
           </button>
 
           <div
             role="group"
             aria-label="Cooking instruction layout mode"
-            className="flex items-center gap-1 p-1 rounded-xl bg-[#0D0D0D] border border-white/10"
+            className="flex items-center gap-1 p-1 rounded-xl bg-white border border-slate-200 shadow-sm"
           >
             <button
               type="button"
               onClick={() => setViewMode('flashcard')}
-              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'flashcard'
-                  ? 'bg-[#00F0FF] text-[#0D0D0D] font-semibold'
-                  : 'text-[#94A3B8] hover:text-white'
+                  ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Layers className="w-3.5 h-3.5" />
@@ -238,10 +232,10 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
             <button
               type="button"
               onClick={() => setViewMode('timeline')}
-              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'timeline'
-                  ? 'bg-[#00F0FF] text-[#0D0D0D] font-semibold'
-                  : 'text-[#94A3B8] hover:text-white'
+                  ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <ListOrdered className="w-3.5 h-3.5" />
@@ -254,38 +248,38 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
       {/* Dish Title & Quantitative Summary Bar */}
       <div className="mt-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#94A3B8]">
-            <span className="text-[#00F0FF] font-semibold">
+          <div className="flex items-center gap-2 text-xs text-slate-600">
+            <span className="text-[#FF5A1F] font-extrabold">
               {recipe.cuisine}
             </span>
             <span aria-hidden="true">·</span>
-            <span>{recipe.meal_type}</span>
+            <span className="font-semibold text-slate-800">{recipe.meal_type}</span>
             <span aria-hidden="true">·</span>
-            <span className="font-mono tabular-nums text-[#B8FF01]">
+            <span className="font-mono font-bold tabular-nums text-violet-700">
               {recipe.crafting_difficulty} Craft
             </span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-[#F2F5F8] mt-1">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             {recipe.title}
           </h2>
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 rounded-xl border border-white/10 bg-[#0D0D0D] px-4 py-3 text-xs font-mono tabular-nums">
-          <div className="flex items-center gap-1.5">
-            <Clock className="w-4 h-4 text-[#00F0FF]" />
+        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-orange-200 bg-white px-4 py-3 text-xs font-mono font-bold tabular-nums shadow-sm">
+          <div className="flex items-center gap-1.5 text-slate-800">
+            <Clock className="w-4 h-4 text-[#FF5A1F]" />
             <span>{recipe.prep_cook_minutes} min</span>
           </div>
-          <span aria-hidden="true" className="text-white/20">
+          <span aria-hidden="true" className="text-slate-300">
             ·
           </span>
-          <div className="flex items-center gap-1.5">
-            <Flame className="w-4 h-4 text-[#FF2A85]" />
+          <div className="flex items-center gap-1.5 text-slate-800">
+            <Flame className="w-4 h-4 text-rose-600" />
             <span>{recipe.total_calories} kcal</span>
           </div>
-          <span aria-hidden="true" className="text-white/20">
+          <span aria-hidden="true" className="text-slate-300">
             ·
           </span>
-          <span className="text-[#B8FF01] font-semibold">
+          <span className="text-emerald-700">
             Protein: {recipe.protein_g}g
           </span>
         </div>
@@ -293,15 +287,15 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
 
       {/* Progress Bar */}
       <div className="mt-5">
-        <div className="flex items-center justify-between text-xs font-mono tabular-nums text-[#94A3B8] mb-1.5">
+        <div className="flex items-center justify-between text-xs font-mono font-semibold tabular-nums text-slate-600 mb-1.5">
           <span>
             Step {activeStepIndex + 1} of {totalSteps}
           </span>
-          <span>{progressPercent}% Crafting Progress</span>
+          <span className="text-[#FF5A1F]">{progressPercent}% Cooking Progress</span>
         </div>
-        <div className="w-full h-2 rounded-full bg-[#0D0D0D] overflow-hidden border border-white/10">
+        <div className="w-full h-2.5 rounded-full bg-orange-100 overflow-hidden border border-orange-200">
           <div
-            className="h-full bg-gradient-to-r from-[#00F0FF] to-[#B8FF01] transition-all duration-300"
+            className="h-full bg-gradient-to-r from-[#FF5A1F] via-[#F59E0B] to-emerald-500 transition-all duration-300"
             style={{ width: `${progressPercent}%` }}
           />
         </div>
@@ -311,19 +305,19 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
       {viewMode === 'flashcard' ? (
         <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
           {/* Active Flashcard */}
-          <div className="lg:col-span-8 rounded-2xl border border-[#00F0FF]/35 bg-[#0D0D0D] p-5 sm:p-7 flex flex-col justify-between">
+          <div className="lg:col-span-8 rounded-2xl border-2 border-orange-200 bg-white p-5 sm:p-7 flex flex-col justify-between shadow-sm">
             <div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-mono font-semibold text-[#00F0FF]">
-                  0{activeStepIndex + 1}. ACTIVE CRAFTING STEP
+                <span className="text-xs font-mono font-extrabold text-[#FF5A1F]">
+                  0{activeStepIndex + 1}. ACTIVE COOKING STEP
                 </span>
                 <button
                   type="button"
                   onClick={() => toggleStepCompleted(activeStepIndex)}
-                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 border transition-colors cursor-pointer ${
+                  className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-colors cursor-pointer ${
                     completedSteps[activeStepIndex]
-                      ? 'border-[#B8FF01] bg-[#B8FF01]/15 text-[#B8FF01]'
-                      : 'border-white/15 bg-[#141619] text-[#94A3B8] hover:text-white'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                   }`}
                 >
                   <CheckCircle2 className="w-4 h-4" />
@@ -335,27 +329,27 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                 </button>
               </div>
 
-              <p className="mt-4 text-lg sm:text-xl font-medium text-[#F2F5F8] leading-relaxed">
+              <p className="mt-4 text-lg sm:text-xl font-semibold text-slate-900 leading-relaxed">
                 {currentStep.instruction}
               </p>
 
               {currentStep.tip && (
-                <div className="mt-4 rounded-xl border border-white/10 bg-[#141619] p-3.5 text-xs sm:text-sm text-[#CBD5E1]">
-                  <strong className="text-[#B8FF01]">Culinary Note: </strong>
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 text-xs sm:text-sm text-slate-800">
+                  <strong className="text-[#EA580C]">Chef Pro-Tip: </strong>
                   {currentStep.tip}
                 </div>
               )}
             </div>
 
             {/* Step Navigation Buttons */}
-            <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+            <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between gap-3">
               <button
                 type="button"
                 disabled={activeStepIndex === 0}
                 onClick={() =>
                   setActiveStepIndex((prev) => Math.max(0, prev - 1))
                 }
-                className="min-h-[44px] px-4 py-2 rounded-xl border border-white/15 bg-[#141619] text-xs font-medium text-[#F2F5F8] hover:border-white/35 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 hover:bg-slate-100 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Previous Step</span>
@@ -368,12 +362,12 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                     type="button"
                     onClick={() => setActiveStepIndex(idx)}
                     aria-label={`Jump to step ${idx + 1}`}
-                    className={`w-8 h-8 rounded-lg font-mono text-xs font-semibold transition-colors cursor-pointer ${
+                    className={`w-8 h-8 rounded-lg font-mono text-xs font-bold transition-all cursor-pointer ${
                       idx === activeStepIndex
-                        ? 'bg-[#00F0FF] text-[#0D0D0D]'
+                        ? 'bg-[#FF5A1F] text-white shadow-sm'
                         : completedSteps[idx]
-                        ? 'bg-[#B8FF01]/20 text-[#B8FF01] border border-[#B8FF01]/40'
-                        : 'bg-[#141619] text-[#94A3B8] border border-white/10'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-slate-100 text-slate-700 border border-slate-200'
                     }`}
                   >
                     {idx + 1}
@@ -393,7 +387,7 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                       Math.min(totalSteps - 1, prev + 1)
                     );
                   }}
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-[#00F0FF] text-[#0D0D0D] font-semibold text-xs hover:bg-[#00F0FF]/90 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-bold text-xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <span>Next Step</span>
                   <ChevronRight className="w-4 h-4" />
@@ -402,7 +396,7 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                 <button
                   type="button"
                   onClick={handleFinishDish}
-                  className="min-h-[44px] px-5 py-2 rounded-xl bg-[#B8FF01] text-[#0D0D0D] font-bold text-xs sm:text-sm hover:bg-[#B8FF01]/90 transition-colors flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs sm:text-sm hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-500/20"
                 >
                   <Sparkles className="w-4 h-4" />
                   <span>Complete Dish & Update Pantry</span>
@@ -412,25 +406,25 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
           </div>
 
           {/* Integrated Countdown Timer Module */}
-          <div className="lg:col-span-4 rounded-2xl border border-white/10 bg-[#0D0D0D] p-5 flex flex-col justify-between">
+          <div className="lg:col-span-4 rounded-2xl border-2 border-teal-200 bg-white p-5 flex flex-col justify-between shadow-sm">
             <div>
-              <span className="text-xs font-mono text-[#94A3B8] block">
+              <span className="text-xs font-mono font-bold text-teal-700 block">
                 INTEGRATED STEP TIMER
               </span>
-              <div className="mt-3 rounded-2xl border border-[#00F0FF]/30 bg-[#141619] p-5 text-center">
+              <div className="mt-3 rounded-2xl border-2 border-teal-200 bg-gradient-to-br from-teal-50/70 to-emerald-50/50 p-5 text-center">
                 <span
                   data-testid="active-step-timer-display"
-                  className={`text-4xl sm:text-5xl font-mono font-bold tabular-nums tracking-tight ${
+                  className={`text-4xl sm:text-5xl font-mono font-extrabold tabular-nums tracking-tight ${
                     isCurrentTimerRunning
-                      ? 'text-[#00F0FF]'
+                      ? 'text-[#FF5A1F]'
                       : currentTimerVal === 0 && currentStep.timer_seconds > 0
-                      ? 'text-[#B8FF01]'
-                      : 'text-[#F2F5F8]'
+                      ? 'text-emerald-600'
+                      : 'text-slate-900'
                   }`}
                 >
                   {formatTimerMMSS(currentTimerVal)}
                 </span>
-                <p className="text-xs text-[#94A3B8] mt-2 font-mono tabular-nums">
+                <p className="text-xs text-slate-600 mt-2 font-mono tabular-nums">
                   {currentStep.timer_seconds > 0
                     ? `Target Duration: ${formatTimerMMSS(
                         currentStep.timer_seconds
@@ -444,10 +438,10 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                 <button
                   type="button"
                   onClick={() => toggleStepTimer(activeStepIndex)}
-                  className={`min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer ${
+                  className={`min-h-[44px] px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm ${
                     isCurrentTimerRunning
-                      ? 'bg-[#FF2A85] text-white'
-                      : 'bg-[#00F0FF] text-[#0D0D0D]'
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white'
                   }`}
                 >
                   {isCurrentTimerRunning ? (
@@ -466,7 +460,7 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                 <button
                   type="button"
                   onClick={() => resetStepTimer(activeStepIndex)}
-                  className="min-h-[44px] px-4 py-2.5 rounded-xl border border-white/15 bg-[#141619] text-[#F2F5F8] hover:border-white/35 font-medium text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Reset</span>
@@ -477,14 +471,14 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                 <button
                   type="button"
                   onClick={() => adjustStepTimer(activeStepIndex, 30)}
-                  className="min-h-[40px] rounded-xl border border-white/10 bg-[#141619] text-xs font-mono text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="min-h-[40px] rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   +30s
                 </button>
                 <button
                   type="button"
                   onClick={() => adjustStepTimer(activeStepIndex, 60)}
-                  className="min-h-[40px] rounded-xl border border-white/10 bg-[#141619] text-xs font-mono text-[#94A3B8] hover:text-white cursor-pointer"
+                  className="min-h-[40px] rounded-xl border border-slate-200 bg-slate-50 text-xs font-mono font-bold text-slate-700 hover:bg-slate-100 cursor-pointer"
                 >
                   +1m
                 </button>
@@ -492,10 +486,10 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
             </div>
 
             {/* Always-Accessible Complete Dish CTA */}
-            <div className="mt-6 pt-4 border-t border-white/10">
-              <p className="text-xs text-[#94A3B8] mb-2.5">
+            <div className="mt-6 pt-4 border-t border-slate-200">
+              <p className="text-xs text-slate-600 mb-2.5">
                 Completing this meal deducts{' '}
-                <strong className="text-[#F2F5F8]">
+                <strong className="text-slate-900">
                   {recipe.used_ingredients.join(', ')}
                 </strong>{' '}
                 from your virtual pantry.
@@ -503,7 +497,7 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
               <button
                 type="button"
                 onClick={handleFinishDish}
-                className="w-full min-h-[48px] rounded-xl bg-[#B8FF01] text-[#0D0D0D] font-bold text-sm hover:bg-[#B8FF01]/90 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full min-h-[48px] rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm hover:opacity-95 transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>Complete Dish & Update Pantry</span>
@@ -522,46 +516,46 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
             return (
               <div
                 key={idx}
-                className={`rounded-2xl border p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                className={`rounded-2xl border-2 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
                   isDone
-                    ? 'border-[#B8FF01]/40 bg-[#0D0D0D]/70'
-                    : 'border-white/10 bg-[#0D0D0D]'
+                    ? 'border-emerald-300 bg-emerald-50/40'
+                    : 'border-slate-200 bg-white'
                 }`}
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center gap-2 text-xs font-mono">
-                    <span className="text-[#00F0FF] font-bold">
+                    <span className="text-[#FF5A1F] font-extrabold">
                       0{idx + 1}.
                     </span>
                     <button
                       type="button"
                       onClick={() => toggleStepCompleted(idx)}
-                      className="text-xs text-[#94A3B8] hover:text-[#B8FF01] cursor-pointer"
+                      className="text-xs font-bold text-slate-600 hover:text-emerald-700 cursor-pointer"
                     >
                       {isDone ? '✓ Completed' : 'Mark Complete'}
                     </button>
                   </div>
-                  <p className="text-sm sm:text-base text-[#F2F5F8]">
+                  <p className="text-sm sm:text-base font-medium text-slate-900">
                     {step.instruction}
                   </p>
                 </div>
 
                 {step.timer_seconds > 0 && (
                   <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="font-mono text-lg font-bold tabular-nums text-[#00F0FF]">
+                    <span className="font-mono text-lg font-extrabold tabular-nums text-[#FF5A1F]">
                       {formatTimerMMSS(rem)}
                     </span>
                     <button
                       type="button"
                       onClick={() => toggleStepTimer(idx)}
-                      className="min-h-[40px] px-3.5 py-2 rounded-xl bg-[#00F0FF] text-[#0D0D0D] font-semibold text-xs cursor-pointer"
+                      className="min-h-[40px] px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-bold text-xs cursor-pointer"
                     >
                       {running ? 'Pause' : 'Start Timer'}
                     </button>
                     <button
                       type="button"
                       onClick={() => resetStepTimer(idx)}
-                      className="min-h-[40px] px-2.5 py-2 rounded-xl border border-white/10 bg-[#141619] text-xs text-[#94A3B8] hover:text-white cursor-pointer"
+                      className="min-h-[40px] px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer"
                     >
                       Reset
                     </button>
@@ -575,7 +569,7 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
             <button
               type="button"
               onClick={handleFinishDish}
-              className="min-h-[48px] px-6 py-3 rounded-xl bg-[#B8FF01] text-[#0D0D0D] font-bold text-sm hover:bg-[#B8FF01]/90 transition-colors flex items-center gap-2 cursor-pointer"
+              className="min-h-[48px] px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer shadow-md"
             >
               <CheckCircle2 className="w-4 h-4" />
               <span>Complete Dish & Update Pantry</span>
@@ -587,10 +581,10 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
       {dishCompletedBanner && (
         <div
           role="status"
-          className="mt-5 rounded-xl border border-[#B8FF01] bg-[#B8FF01]/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+          className="mt-5 rounded-2xl border-2 border-emerald-400 bg-emerald-50 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
         >
-          <div className="flex items-center gap-2.5 text-sm text-[#B8FF01] font-semibold">
-            <CheckCircle2 className="w-5 h-5 shrink-0" />
+          <div className="flex items-center gap-2.5 text-sm text-emerald-900 font-bold">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <span>
               Dish Crafted! Your virtual pantry quantities and daily macro log have been updated.
             </span>
@@ -598,7 +592,7 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
           <button
             type="button"
             onClick={onBackToRecipes}
-            className="min-h-[40px] px-4 py-2 rounded-lg bg-[#B8FF01] text-[#0D0D0D] text-xs font-bold cursor-pointer"
+            className="min-h-[40px] px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer"
           >
             Explore Next Meal
           </button>

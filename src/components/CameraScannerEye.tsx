@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertCircle,
   SwitchCamera,
+  Eye,
 } from 'lucide-react';
 import type { InventoryItem, MealType, SnapChefPayload } from '../types/snapchef';
 import { SCAN_PRESET_SCENES } from '../data/seedData';
@@ -20,7 +21,10 @@ interface CameraScannerEyeProps {
     mode: 'replace' | 'merge',
     sourceLabel: string
   ) => void;
-  onAddSingleIngredient: (item: InventoryItem, newRecipes?: SnapChefPayload['recipes']) => void;
+  onAddSingleIngredient: (
+    item: InventoryItem,
+    newRecipes?: SnapChefPayload['recipes']
+  ) => void;
   activeMealFilter: 'All' | MealType;
   inventoryCount: number;
 }
@@ -42,8 +46,13 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
     'environment'
   );
   const [isScanning, setIsScanning] = useState(false);
+  const [shutterFlash, setShutterFlash] = useState(false);
+  const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(
+    null
+  );
+  const [lastDetectedItems, setLastDetectedItems] = useState<string[]>([]);
   const [scanStatusText, setScanStatusText] = useState<string>(
-    'Point reticle inside fridge, vegetable basket, or cupboard'
+    'Point camera lens at any ingredient, fruit, snack, or open fridge and press Capture & Scan'
   );
   const [scanError, setScanError] = useState<string | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string>(
@@ -65,6 +74,7 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
   const startCamera = useCallback(
     async (preferredFacing: 'environment' | 'user' = facingMode) => {
       stopCameraStream();
+      setCapturedPreviewUrl(null);
       setCameraState('prompting');
       setScanError(null);
 
@@ -75,7 +85,7 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
       ) {
         setCameraState('fallback');
         setScanStatusText(
-          'Simulated Optical Viewfinder ready — Capture frame or upload photo'
+          'Interactive Kitchen Lens Ready — Press Capture & Scan or Upload a Photo'
         );
         return;
       }
@@ -96,19 +106,18 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         }
         setCameraState('live');
         setScanStatusText(
-          'Live optical feed locked — Point inside fridge or pantry and tap Capture'
+          'Live camera lens locked — Focus on any ingredient or food item and press Capture & Scan!'
         );
       } catch {
         setCameraState('fallback');
         setScanStatusText(
-          'Interactive Fridge Viewfinder active — Tap Capture Frame or Upload Photo'
+          'Interactive Kitchen Viewfinder Active — Press Capture & Scan or Upload Photo'
         );
       }
     },
     [facingMode, stopCameraStream]
   );
 
-  // Immediate camera prompt on mount per PRD 4.1
   useEffect(() => {
     startCamera('environment');
     return () => {
@@ -123,54 +132,86 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
   };
 
   /**
-   * Renders either the live WebRTC video frame or a high-contrast visual pantry simulation
-   * onto a canvas and returns a base64 JPEG data URL.
+   * Captures the exact frame currently focused in the <video> lens (or simulated canvas)
+   * so the vision API immediately scans what the user is pointing at.
    */
-  const captureFrameAsBase64 = (): string => {
+  const captureFrameAsBase64 = (): {
+    dataUrl: string;
+    isLiveVideoFrame: boolean;
+  } => {
     const canvas = canvasRef.current || document.createElement('canvas');
-    canvas.width = 640;
-    canvas.height = 360;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
+    const video = videoRef.current;
 
     if (
       cameraState === 'live' &&
-      videoRef.current &&
-      videoRef.current.readyState >= 2
+      video &&
+      video.readyState >= 2 &&
+      video.videoWidth > 0 &&
+      video.videoHeight > 0
     ) {
-      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-    } else {
-      // Draw a labeled kitchen shelf representation for the vision model
-      ctx.fillStyle = '#0D0D0D';
+      const scale = Math.min(1, 960 / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return {
+          dataUrl: canvas.toDataURL('image/jpeg', 0.88),
+          isLiveVideoFrame: true,
+        };
+      }
+    }
+
+    canvas.width = 640;
+    canvas.height = 360;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#FFF7ED';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#00F0FF';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#FF5A1F';
+      ctx.lineWidth = 4;
       ctx.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
-      ctx.fillStyle = '#F2F5F8';
+      ctx.fillStyle = '#0F172A';
       ctx.font = 'bold 20px sans-serif';
       ctx.fillText(
-        'Kitchen Inventory: Potatoes, Fresh Paneer, Eggs, Spinach,',
+        'Fresh Kitchen Basket: Potatoes, Fresh Paneer, Pasture Eggs,',
         36,
-        120
+        130
       );
       ctx.fillText(
-        'Chickpeas, Vine Tomatoes, Poha, Masarepa, Black Beans, Cumin',
+        'Baby Spinach, Chickpeas, Vine Tomatoes, Poha & Cumin Spices',
         36,
-        160
+        175
       );
     }
 
-    return canvas.toDataURL('image/jpeg', 0.82);
+    return {
+      dataUrl: canvas.toDataURL('image/jpeg', 0.85),
+      isLiveVideoFrame: false,
+    };
   };
 
   const handleCaptureAndScan = async () => {
+    if (isScanning) return;
+
+    // 1. Instant Shutter Flash & Freeze Frame on whatever the lens is focusing on
+    setShutterFlash(true);
+    window.setTimeout(() => setShutterFlash(false), 220);
+
+    const { dataUrl, isLiveVideoFrame } = captureFrameAsBase64();
+    if (isLiveVideoFrame && dataUrl) {
+      setCapturedPreviewUrl(dataUrl);
+    }
+
     setIsScanning(true);
     setScanError(null);
+    setLastDetectedItems([]);
     setScanStatusText(
-      'Mapping physical ingredients & synthesizing zero-missing-ingredient recipes...'
+      isLiveVideoFrame
+        ? 'Optical Lock Engaged — Scanning the exact food item in your camera lens...'
+        : 'Scanning kitchen ingredients & synthesizing joyful global recipes...'
     );
 
-    const base64DataUrl = captureFrameAsBase64();
     const activePreset =
       SCAN_PRESET_SCENES.find((p) => p.id === selectedPresetId) ||
       SCAN_PRESET_SCENES[0];
@@ -180,9 +221,10 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          imageBase64: base64DataUrl,
+          imageBase64: dataUrl,
           mimeType: 'image/jpeg',
           mealIntent: activeMealFilter,
+          isSimulatedFallback: !isLiveVideoFrame,
         }),
       });
 
@@ -194,36 +236,54 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
       const normalized = normalizeSnapChefPayload(rawData);
 
       if (normalized.inventory.length > 0) {
+        const names = normalized.inventory.map((i) => i.name);
+        setLastDetectedItems(names);
         onScanComplete(
           normalized,
           mergeMode,
-          `Live Optical Capture (${normalized.inventory.length} items)`
+          `Lens Scan: ${names.slice(0, 3).join(', ')}`
         );
         setScanStatusText(
-          `Mapped ${normalized.inventory.length} ingredients and synthesized ${normalized.recipes.length} recipes.`
+          normalized.scan_summary ||
+            `Scanned ${names.join(', ')} and crafted ${normalized.recipes.length} recipes!`
+        );
+      } else if (isLiveVideoFrame) {
+        // The live camera pointed at something without recognizable food
+        setScanStatusText(
+          rawData?.scan_summary ||
+            'No clear food item detected in focus — hold an ingredient, fruit, vegetable, or snack inside the reticle and tap Capture & Scan!'
         );
       } else {
-        onScanComplete(
-          activePreset.payload,
-          mergeMode,
-          activePreset.label
+        onScanComplete(activePreset.payload, mergeMode, activePreset.label);
+        setLastDetectedItems(
+          activePreset.payload.inventory.slice(0, 5).map((i) => i.name)
         );
         setScanStatusText(
           `Loaded ${activePreset.payload.inventory.length} items from ${activePreset.label}.`
         );
       }
     } catch {
-      // Seamless fallback to the selected preset scene so mobile/desktop testing never breaks
-      onScanComplete(
-        activePreset.payload,
-        mergeMode,
-        activePreset.label
-      );
-      setScanStatusText(
-        `Cataloged ${activePreset.payload.inventory.length} items & ${activePreset.payload.recipes.length} global recipes (${activePreset.label}).`
-      );
+      if (!isLiveVideoFrame) {
+        onScanComplete(activePreset.payload, mergeMode, activePreset.label);
+        setLastDetectedItems(
+          activePreset.payload.inventory.slice(0, 5).map((i) => i.name)
+        );
+        setScanStatusText(
+          `Cataloged ${activePreset.payload.inventory.length} items & ${activePreset.payload.recipes.length} global recipes (${activePreset.label}).`
+        );
+      } else {
+        setScanError(
+          'Could not reach vision scanner right now — try tapping Capture & Scan again or type the item name below.'
+        );
+      }
     } finally {
       setIsScanning(false);
+      // Automatically release frozen preview back to live camera after 3.5s
+      if (isLiveVideoFrame) {
+        window.setTimeout(() => {
+          setCapturedPreviewUrl(null);
+        }, 3500);
+      }
     }
   };
 
@@ -233,7 +293,8 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
 
     setIsScanning(true);
     setScanError(null);
-    setScanStatusText(`Analyzing photo "${file.name}" with Argon Spatial Vision...`);
+    setLastDetectedItems([]);
+    setScanStatusText(`Scanning uploaded photo "${file.name}"...`);
 
     try {
       const base64DataUrl = await new Promise<string>((resolve, reject) => {
@@ -243,6 +304,8 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         reader.readAsDataURL(file);
       });
 
+      setCapturedPreviewUrl(base64DataUrl);
+
       const response = await fetch('/api/scan-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -250,6 +313,7 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
           imageBase64: base64DataUrl,
           mimeType: file.type || 'image/jpeg',
           mealIntent: activeMealFilter,
+          isSimulatedFallback: false,
         }),
       });
 
@@ -260,9 +324,15 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
       const rawData = await response.json();
       const normalized = normalizeSnapChefPayload(rawData);
       if (normalized.inventory.length > 0) {
-        onScanComplete(normalized, mergeMode, `Photo Scan: ${file.name}`);
+        const names = normalized.inventory.map((i) => i.name);
+        setLastDetectedItems(names);
+        onScanComplete(
+          normalized,
+          mergeMode,
+          `Photo Scan: ${names.slice(0, 3).join(', ')}`
+        );
         setScanStatusText(
-          `Extracted ${normalized.inventory.length} items from ${file.name}.`
+          `Detected ${names.join(', ')} from your photo and synthesized ${normalized.recipes.length} recipes!`
         );
       } else {
         throw new Error('Empty extraction');
@@ -285,9 +355,12 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
     setSelectedPresetId(presetId);
     const preset = SCAN_PRESET_SCENES.find((p) => p.id === presetId);
     if (!preset) return;
+    setLastDetectedItems(
+      preset.payload.inventory.slice(0, 5).map((i) => i.name)
+    );
     onScanComplete(preset.payload, mergeMode, preset.label);
     setScanStatusText(
-      `Loaded "${preset.label}" — ${preset.payload.inventory.length} ingredients & ${preset.payload.recipes.length} recipes ready.`
+      `Loaded "${preset.label}" — ${preset.payload.inventory.length} ingredients & ${preset.payload.recipes.length} joyful recipes ready!`
     );
   };
 
@@ -323,8 +396,9 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
           };
           onAddSingleIngredient(item, normalized.recipes);
           setManualName('');
+          setLastDetectedItems([item.name]);
           setScanStatusText(
-            `Profiled "${item.name}" (${item.calories_per_100g} kcal/100g) & added to virtual pantry.`
+            `Profiled "${item.name}" (${item.calories_per_100g} kcal/100g) & added to your kitchen!`
           );
           setIsAddingManual(false);
           return;
@@ -354,28 +428,29 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
 
     onAddSingleIngredient(fallbackItem);
     setManualName('');
-    setScanStatusText(`Added "${trimmed}" (${grams}g) to Inventory Loot Grid.`);
+    setLastDetectedItems([fallbackItem.name]);
+    setScanStatusText(`Added "${trimmed}" (${grams}g) to your Kitchen Inventory!`);
     setIsAddingManual(false);
   };
 
   return (
     <section
       aria-label="The Eye Camera Scanner"
-      className="rounded-2xl border border-white/10 bg-[#141619] p-4 sm:p-6 shadow-xl"
+      className="rounded-3xl border-2 border-orange-200/80 bg-white p-4 sm:p-6 shadow-xl shadow-orange-500/5"
     >
       {/* Header Row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-orange-100">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#00F0FF] font-medium">
+          <div className="flex items-center gap-2 text-xs text-[#FF5A1F] font-semibold">
             <ScanLine className="w-4 h-4" />
-            <span>Optical Ingredient Scanner</span>
+            <span>Live Optical Ingredient Scanner</span>
             <span aria-hidden="true">·</span>
-            <span className="font-mono tabular-nums text-[#94A3B8]">
-              {inventoryCount} Items in Pantry
+            <span className="font-mono tabular-nums text-slate-600">
+              {inventoryCount} Items in Kitchen
             </span>
           </div>
-          <h2 className="text-lg sm:text-xl font-bold text-[#F2F5F8] mt-1">
-            The Eye — Physical Ingredient Mapper
+          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-1">
+            The Eye — Point at Any Ingredient & Press Capture
           </h2>
         </div>
 
@@ -383,36 +458,36 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         <div
           role="group"
           aria-label="Scan inventory mode"
-          className="flex items-center gap-1 p-1 rounded-xl bg-[#0D0D0D] border border-white/10"
+          className="flex items-center gap-1 p-1 rounded-xl bg-orange-50 border border-orange-200/70"
         >
           <button
             type="button"
             onClick={() => setMergeMode('replace')}
-            className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               mergeMode === 'replace'
-                ? 'bg-[#00F0FF] text-[#0D0D0D] font-semibold'
-                : 'text-[#94A3B8] hover:text-white'
+                ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Fresh Scan
+            Focus Scan (Replace)
           </button>
           <button
             type="button"
             onClick={() => setMergeMode('merge')}
-            className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               mergeMode === 'merge'
-                ? 'bg-[#00F0FF] text-[#0D0D0D] font-semibold'
-                : 'text-[#94A3B8] hover:text-white'
+                ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Append to Pantry
+            Add to Pantry
           </button>
         </div>
       </div>
 
       {/* Live Viewfinder + HUD Targeting Reticle */}
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        <div className="lg:col-span-7 flex flex-col justify-between rounded-2xl overflow-hidden border border-[#00F0FF]/30 bg-[#0D0D0D] relative min-h-[260px] sm:min-h-[310px]">
+      <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-7 flex flex-col justify-between rounded-2xl overflow-hidden border-2 border-teal-400/60 bg-slate-900 relative min-h-[290px] sm:min-h-[340px] shadow-lg">
           {/* Live WebRTC Video Element */}
           <video
             ref={videoRef}
@@ -420,36 +495,79 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
             muted
             autoPlay
             className={`w-full h-full object-cover absolute inset-0 ${
-              cameraState === 'live' ? 'opacity-90' : 'opacity-0 pointer-events-none'
+              cameraState === 'live'
+                ? 'opacity-100'
+                : 'opacity-0 pointer-events-none'
             }`}
           />
+
+          {/* Frozen Captured Frame Preview during/after Scan */}
+          {capturedPreviewUrl && (
+            <img
+              src={capturedPreviewUrl}
+              alt="Captured camera frame being analyzed"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover absolute inset-0 z-10"
+            />
+          )}
+
+          {/* White Camera Shutter Flash */}
+          {shutterFlash && (
+            <div className="absolute inset-0 z-30 bg-white/90 pointer-events-none transition-opacity" />
+          )}
+
           <canvas ref={canvasRef} className="hidden" />
 
-          {/* Simulated Interactive Viewfinder Background when camera is not streaming */}
-          {cameraState !== 'live' && (
-            <div className="absolute inset-0 bg-gradient-to-br from-[#0D0D0D] via-[#111822] to-[#0D0D0D] p-5 flex flex-col justify-between">
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 my-auto opacity-90">
+          {/* Colorful Simulated Kitchen Backdrop when live camera isn't active */}
+          {cameraState !== 'live' && !capturedPreviewUrl && (
+            <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-teal-950 to-indigo-950 p-5 flex flex-col justify-between">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2.5 my-auto">
                 {[
-                  { name: 'Potato', cal: '77 kcal', tag: 'Tubers · 450g', accent: '#00F0FF' },
-                  { name: 'Fresh Paneer', cal: '265 kcal', tag: 'Dairy · 250g', accent: '#B8FF01' },
-                  { name: 'Eggs (x6)', cal: '143 kcal', tag: 'Protein · 300g', accent: '#FF2A85' },
-                  { name: 'Baby Spinach', cal: '23 kcal', tag: 'Leafy · 200g', accent: '#B8FF01' },
-                  { name: 'Chickpeas', cal: '164 kcal', tag: 'Legume · 350g', accent: '#00F0FF' },
+                  {
+                    name: 'Potato',
+                    cal: '77 kcal',
+                    tag: 'Tubers · 450g',
+                    color: '#38BDF8',
+                  },
+                  {
+                    name: 'Fresh Paneer',
+                    cal: '265 kcal',
+                    tag: 'Dairy · 250g',
+                    color: '#34D399',
+                  },
+                  {
+                    name: 'Eggs (x6)',
+                    cal: '143 kcal',
+                    tag: 'Protein · 300g',
+                    color: '#FB7185',
+                  },
+                  {
+                    name: 'Baby Spinach',
+                    cal: '23 kcal',
+                    tag: 'Leafy · 200g',
+                    color: '#A3E635',
+                  },
+                  {
+                    name: 'Chickpeas',
+                    cal: '164 kcal',
+                    tag: 'Legume · 350g',
+                    color: '#FBBF24',
+                  },
                 ].map((box) => (
                   <div
                     key={box.name}
-                    className="rounded-xl border border-white/15 bg-[#141619]/90 p-2.5 flex flex-col justify-between"
+                    className="rounded-xl border border-white/20 bg-white/10 backdrop-blur-md p-2.5 flex flex-col justify-between"
                   >
                     <span
-                      className="text-[11px] font-mono font-semibold truncate"
-                      style={{ color: box.accent }}
+                      className="text-[11px] font-mono font-bold truncate"
+                      style={{ color: box.color }}
                     >
                       {box.name}
                     </span>
-                    <span className="text-[10px] text-[#94A3B8] mt-1 truncate">
+                    <span className="text-[10px] text-slate-300 mt-1 truncate">
                       {box.tag}
                     </span>
-                    <span className="text-xs font-mono tabular-nums text-[#F2F5F8] mt-1.5">
+                    <span className="text-xs font-mono tabular-nums text-white mt-1.5 font-semibold">
                       {box.cal}
                     </span>
                   </div>
@@ -458,52 +576,74 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
             </div>
           )}
 
-          {/* Cyberpunk Targeting Reticle Overlay */}
-          <div className="relative z-10 flex flex-col justify-between h-full p-4 pointer-events-none">
+          {/* Vibrant Targeting Reticle Overlay */}
+          <div className="relative z-20 flex flex-col justify-between h-full p-4 pointer-events-none">
             {/* Top Reticle Status */}
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-mono text-[#00F0FF] bg-[#0D0D0D]/80 px-2.5 py-1 rounded-md border border-[#00F0FF]/30">
-                {cameraState === 'live'
-                  ? 'OPTICAL FEED: LIVE WEBRTC'
-                  : 'OPTICAL FEED: READY (SIMULATED / UPLOAD)'}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-mono font-semibold text-teal-300 bg-slate-950/80 px-3 py-1 rounded-lg border border-teal-400/40">
+                {isScanning
+                  ? 'SCANNING LENS TARGET...'
+                  : cameraState === 'live'
+                  ? 'LIVE CAMERA FEED ACTIVE'
+                  : 'INTERACTIVE KITCHEN VIEWFINDER'}
               </span>
-              <span className="text-xs font-mono tabular-nums text-[#B8FF01] bg-[#0D0D0D]/80 px-2.5 py-1 rounded-md border border-[#B8FF01]/30">
-                RETICLE LOCK: 98.4%
+              <span className="text-xs font-mono tabular-nums font-semibold text-amber-300 bg-slate-950/80 px-3 py-1 rounded-lg border border-amber-400/40">
+                {isScanning ? 'ANALYZING MACROS...' : 'FOCUS LOCK READY'}
               </span>
             </div>
 
-            {/* Center Crosshair Corners */}
-            <div className="my-auto mx-auto w-44 h-28 sm:w-60 sm:h-36 relative border border-[#00F0FF]/20 rounded-xl flex items-center justify-center">
-              <div className="absolute -top-0.5 -left-0.5 w-5 h-5 border-t-2 border-l-2 border-[#00F0FF] rounded-tl" />
-              <div className="absolute -top-0.5 -right-0.5 w-5 h-5 border-t-2 border-r-2 border-[#00F0FF] rounded-tr" />
-              <div className="absolute -bottom-0.5 -left-0.5 w-5 h-5 border-b-2 border-l-2 border-[#00F0FF] rounded-bl" />
-              <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 border-b-2 border-r-2 border-[#00F0FF] rounded-br" />
+            {/* Center Focus Reticle */}
+            <div
+              className={`my-auto mx-auto w-48 h-32 sm:w-64 sm:h-40 relative rounded-2xl flex flex-col items-center justify-center transition-all ${
+                isScanning
+                  ? 'border-2 border-amber-400 bg-amber-400/10 shadow-[0_0_30px_rgba(251,191,36,0.35)]'
+                  : 'border border-teal-300/40 bg-slate-950/20'
+              }`}
+            >
+              <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-3 border-l-3 border-teal-300 rounded-tl-lg" />
+              <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-3 border-r-3 border-teal-300 rounded-tr-lg" />
+              <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-3 border-l-3 border-teal-300 rounded-bl-lg" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-3 border-r-3 border-teal-300 rounded-br-lg" />
+
               {isScanning && (
-                <div className="w-full h-0.5 bg-[#00F0FF] shadow-[0_0_12px_#00F0FF] animate-scanline" />
+                <div className="w-full h-1 bg-gradient-to-r from-teal-300 via-amber-300 to-rose-400 shadow-[0_0_16px_#FBBF24] animate-scanline" />
               )}
-              <span className="text-[11px] font-mono text-[#F2F5F8]/80 bg-[#0D0D0D]/75 px-2.5 py-1 rounded">
-                {isScanning ? 'MAPPING INGREDIENTS...' : 'TARGET FRIDGE / SHELF'}
+
+              <span className="text-xs font-mono font-bold text-white bg-slate-950/80 px-3 py-1.5 rounded-lg border border-white/15">
+                {isScanning
+                  ? 'IDENTIFYING ITEM IN LENS...'
+                  : 'CENTER INGREDIENT HERE'}
               </span>
+
+              {lastDetectedItems.length > 0 && !isScanning && (
+                <p className="mt-1.5 text-[11px] font-mono text-emerald-300 bg-slate-950/85 px-2.5 py-0.5 rounded">
+                  Detected: {lastDetectedItems.slice(0, 3).join(' · ')}
+                </p>
+              )}
             </div>
 
             {/* Bottom Live Status Bar */}
-            <div className="bg-gradient-to-t from-black/90 via-black/60 to-transparent -mx-4 -mb-4 p-4 flex items-center justify-between gap-2">
-              <p className="text-xs text-[#F2F5F8] truncate">{scanStatusText}</p>
+            <div className="bg-gradient-to-t from-slate-950/95 via-slate-950/70 to-transparent -mx-4 -mb-4 p-4 flex items-center justify-between gap-2">
+              <p className="text-xs font-medium text-white truncate">
+                {scanStatusText}
+              </p>
             </div>
           </div>
 
           {/* Interactive Camera Control Overlay Bar */}
-          <div className="relative z-20 bg-[#0D0D0D]/95 border-t border-white/10 p-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="relative z-30 bg-slate-950 border-t border-white/15 p-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={handleCaptureAndScan}
                 disabled={isScanning}
-                className="min-h-[44px] px-4 py-2 rounded-xl bg-[#00F0FF] text-[#0D0D0D] font-semibold text-xs sm:text-sm hover:bg-[#00F0FF]/90 disabled:opacity-50 transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[46px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] via-[#FF2E63] to-[#F59E0B] text-white font-bold text-xs sm:text-sm hover:opacity-95 active:scale-[0.98] disabled:opacity-60 transition-all shadow-lg shadow-rose-500/25 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Camera className="w-4 h-4" />
                 <span>
-                  {isScanning ? 'Scanning Kitchen...' : 'Capture & Scan Fridge'}
+                  {isScanning
+                    ? 'Scanning Lens Target...'
+                    : 'Capture & Scan Fridge'}
                 </span>
               </button>
 
@@ -511,11 +651,22 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isScanning}
-                className="min-h-[44px] px-3.5 py-2 rounded-xl border border-white/15 bg-[#141619] text-[#F2F5F8] hover:border-[#00F0FF]/50 text-xs font-medium transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-[46px] px-3.5 py-2 rounded-xl border border-white/20 bg-slate-900 text-white hover:border-teal-400 text-xs font-semibold transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Upload className="w-4 h-4 text-[#B8FF01]" />
+                <Upload className="w-4 h-4 text-teal-300" />
                 <span>Photo / Camera Roll</span>
               </button>
+
+              {capturedPreviewUrl && !isScanning && (
+                <button
+                  type="button"
+                  onClick={() => setCapturedPreviewUrl(null)}
+                  className="min-h-[46px] px-3 py-2 rounded-xl border border-teal-400/40 bg-teal-950/60 text-teal-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>Live Feed</span>
+                </button>
+              )}
 
               <input
                 ref={fileInputRef}
@@ -532,21 +683,21 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
               <button
                 type="button"
                 onClick={handleFlipCamera}
-                className="min-h-[44px] min-w-[44px] px-2.5 rounded-xl border border-white/10 bg-[#141619] text-[#94A3B8] hover:text-white flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                className="min-h-[44px] min-w-[44px] px-2.5 rounded-xl border border-white/15 bg-slate-900 text-slate-200 hover:text-white flex items-center justify-center gap-1.5 text-xs cursor-pointer"
                 aria-label="Switch front or rear camera"
                 title="Switch Camera (Front / Rear)"
               >
-                <SwitchCamera className="w-4 h-4" />
+                <SwitchCamera className="w-4 h-4 text-amber-300" />
                 <span className="hidden sm:inline">Flip Lens</span>
               </button>
               <button
                 type="button"
                 onClick={() => startCamera(facingMode)}
-                className="min-h-[44px] min-w-[44px] px-2.5 rounded-xl border border-white/10 bg-[#141619] text-[#94A3B8] hover:text-white flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                className="min-h-[44px] min-w-[44px] px-2.5 rounded-xl border border-white/15 bg-slate-900 text-slate-200 hover:text-white flex items-center justify-center gap-1.5 text-xs cursor-pointer"
                 aria-label="Reconnect live camera"
                 title="Retry Live WebRTC Camera"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4 text-teal-300" />
               </button>
             </div>
           </div>
@@ -554,15 +705,17 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
 
         {/* Right Column: Instant Kitchen Preset Captures & Quick Ingredient Adder */}
         <div className="lg:col-span-5 flex flex-col justify-between gap-4">
-          <div className="rounded-2xl border border-white/10 bg-[#0D0D0D] p-4">
+          <div className="rounded-2xl border border-orange-200/80 bg-gradient-to-br from-orange-50/70 via-amber-50/40 to-rose-50/50 p-4">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-[#F2F5F8]">
+              <h3 className="text-sm font-bold text-slate-900">
                 Instant Test Fridge Captures
               </h3>
-              <span className="text-xs text-[#94A3B8]">1-Tap Simulation</span>
+              <span className="text-xs font-semibold text-[#FF5A1F]">
+                1-Tap Kitchen Stock
+              </span>
             </div>
-            <p className="text-xs text-[#94A3B8] mt-1">
-              Test SnapChef immediately on desktop or mobile with pre-scanned kitchen shelves:
+            <p className="text-xs text-slate-600 mt-1">
+              No fridge in front of you? Load a pre-scanned kitchen basket immediately:
             </p>
 
             <div className="mt-3 space-y-2">
@@ -573,29 +726,29 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                     key={scene.id}
                     type="button"
                     onClick={() => handlePresetLoad(scene.id)}
-                    className={`w-full min-h-[52px] text-left rounded-xl p-3 border transition-colors flex items-center justify-between gap-3 cursor-pointer ${
+                    className={`w-full min-h-[54px] text-left rounded-xl p-3 border transition-all flex items-center justify-between gap-3 cursor-pointer ${
                       isSelected
-                        ? 'border-[#00F0FF] bg-[#00F0FF]/10'
-                        : 'border-white/10 bg-[#141619] hover:border-white/25'
+                        ? 'border-[#FF5A1F] bg-white shadow-md shadow-orange-500/10'
+                        : 'border-orange-200/60 bg-white/80 hover:bg-white hover:border-orange-300'
                     }`}
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-[#F2F5F8] truncate">
+                        <span className="text-xs font-bold text-slate-900 truncate">
                           {scene.label}
                         </span>
                       </div>
-                      <p className="text-[11px] text-[#94A3B8] truncate mt-0.5">
+                      <p className="text-[11px] text-slate-600 truncate mt-0.5">
                         {scene.subtitle}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[11px] font-mono text-[#B8FF01]">
+                      <span className="text-[11px] font-mono font-semibold text-emerald-700">
                         {scene.badge}
                       </span>
                       <CheckCircle2
                         className={`w-4 h-4 ${
-                          isSelected ? 'text-[#00F0FF]' : 'text-white/20'
+                          isSelected ? 'text-[#FF5A1F]' : 'text-slate-300'
                         }`}
                       />
                     </div>
@@ -608,16 +761,16 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
           {/* Manual Ingredient Quick-Add Form */}
           <form
             onSubmit={handleQuickAddIngredient}
-            className="rounded-2xl border border-white/10 bg-[#0D0D0D] p-4"
+            className="rounded-2xl border border-teal-200/80 bg-gradient-to-br from-teal-50/60 via-emerald-50/40 to-cyan-50/50 p-4"
           >
             <label
               htmlFor="quick-add-ingredient-input"
-              className="block text-sm font-semibold text-[#F2F5F8]"
+              className="block text-sm font-bold text-slate-900"
             >
-              Add & Profile Single Ingredient
+              Instant Ingredient Profiler
             </label>
-            <p className="text-xs text-[#94A3B8] mt-0.5">
-              Type any item (e.g., Avocado, Sweet Potato, Tofu) to generate its 100g Nutritional Codex:
+            <p className="text-xs text-slate-600 mt-0.5">
+              Type any food item (e.g., Banana, Avocado, Sweet Potato, Tofu) to generate its 100g Nutritional Codex & recipes:
             </p>
 
             <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -629,8 +782,8 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                   setManualName(e.target.value);
                   if (scanError) setScanError(null);
                 }}
-                placeholder="e.g., Sweet Potato, Greek Yogurt..."
-                className="flex-1 min-h-[44px] rounded-xl border border-white/15 bg-[#141619] px-3.5 py-2 text-sm text-[#F2F5F8] placeholder-[#64748B] focus:outline-none focus:border-[#00F0FF]"
+                placeholder="e.g., Banana, Sweet Potato, Greek Yogurt..."
+                className="flex-1 min-h-[44px] rounded-xl border border-teal-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600"
               />
               <div className="flex items-center gap-2">
                 <input
@@ -641,12 +794,12 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                   value={manualGrams}
                   onChange={(e) => setManualGrams(e.target.value)}
                   aria-label="Ingredient weight in grams"
-                  className="w-24 min-h-[44px] rounded-xl border border-white/15 bg-[#141619] px-3 py-2 text-sm font-mono tabular-nums text-[#F2F5F8] focus:outline-none focus:border-[#00F0FF]"
+                  className="w-24 min-h-[44px] rounded-xl border border-teal-300 bg-white px-3 py-2 text-sm font-mono tabular-nums text-slate-900 focus:outline-none focus:border-teal-600"
                 />
                 <button
                   type="submit"
                   disabled={isAddingManual}
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-[#B8FF01] text-[#0D0D0D] font-semibold text-xs hover:bg-[#B8FF01]/90 disabled:opacity-50 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs hover:opacity-95 disabled:opacity-50 transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   {isAddingManual ? (
                     <Sparkles className="w-4 h-4 animate-spin" />
@@ -661,7 +814,7 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
             {scanError && (
               <div
                 role="alert"
-                className="mt-2.5 flex items-center gap-1.5 text-xs text-[#FF2A85]"
+                className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-rose-600"
               >
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{scanError}</span>
