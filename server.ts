@@ -178,11 +178,23 @@ const SNAPCHEF_RESPONSE_SCHEMA = {
           used_ingredients: {
             type: Type.ARRAY,
             items: { type: Type.STRING },
-            description: 'Names of inventory ingredients used in this dish.',
+            description: 'Names of inventory ingredients that the user already has and uses in this dish.',
+          },
+          missing_vegetables: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description:
+              'Specific vegetables or fresh herbs that are lacking/missing from the uploaded photos to complete or garnish this dish (e.g., Fresh Coriander Leaves, 1 Green Chili, Ripe Tomato, Fresh Ginger).',
+          },
+          missing_spices: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description:
+              'Specific spices or seasonings that are lacking/missing from the uploaded photos to cook this dish (e.g., 1/2 tsp Garam Masala, Dry Mango Powder (Amchur), Roasted Cumin Powder, Black Pepper).',
           },
           chef_note: {
             type: Type.STRING,
-            description: 'Brief culinary science note on flavor pairing or nutrition.',
+            description: 'Brief culinary note on how this dish fits the number of people and dietary restrictions.',
           },
           steps: {
             type: Type.ARRAY,
@@ -215,6 +227,9 @@ const SNAPCHEF_RESPONSE_SCHEMA = {
           'total_calories',
           'protein_g',
           'crafting_difficulty',
+          'used_ingredients',
+          'missing_vegetables',
+          'missing_spices',
           'steps',
         ],
       },
@@ -223,15 +238,15 @@ const SNAPCHEF_RESPONSE_SCHEMA = {
   required: ['inventory', 'recipes'],
 };
 
-const SYSTEM_INSTRUCTION = `You are SnapChef, an AI Kitchen Inventory & Global Recipe Synthesizer.
+const SYSTEM_INSTRUCTION = `You are SnapChef, a beginner-friendly AI Kitchen Companion & Global Recipe Synthesizer.
 Your mission:
-1. Examine the camera capture, uploaded photo, or ingredient list and identify EVERY food item, produce, dairy/butter, spice, protein, grain, or culinary ingredient present (for example: Potatoes, Spices, and Butter together).
-2. For each detected item, provide:
-   - Accurate nutritional breakdown per 100g (calories_per_100g, protein_g, carbs_g, fat_g)
-   - Specific 'qualities': texture_and_freshness, flavor_profile, and cooking_behavior
-   - 3 specific physiological/micronutrient health_benefits and a botanical/culinary source_details profile.
-3. Synthesize 6 practical, mouth-watering dishes specifically using the scanned ingredients together across Breakfast (2 recipes), Lunch (2 recipes), and Dinner (2 recipes) across Indian, European, South American, and Global cuisines.
-4. Assign a crafting_difficulty ("Level 1" to "Level 5") and break instructions into focused flashcards with accurate timer_seconds for cooking steps.
+1. Examine the uploaded/captured ingredient photo(s) or ingredient list and identify EVERY food item, vegetable, dairy/butter, spice, protein, or pantry item present.
+2. For each detected item, provide accurate 100g macros, specific 'qualities' (texture_and_freshness, flavor_profile, cooking_behavior), 3 health_benefits, and source_details.
+3. Synthesize 6 delicious, beginner-friendly recipes across Breakfast, Lunch, and Dinner scaled to the requested number of people and respecting any dietary restrictions.
+4. For EVERY recipe, explicitly list:
+   - 'used_ingredients': the ingredients from the user's photos that are used
+   - 'missing_vegetables': which extra vegetables or fresh herbs are lacking/needed to make this dish even better
+   - 'missing_spices': which extra spices or seasonings are lacking/needed to cook this dish properly.
 Always respond with valid JSON matching the requested schema.`;
 
 function parseGeminiJson(rawText: string): Record<string, unknown> {
@@ -415,22 +430,29 @@ async function startServer() {
         mealIntent = 'All',
         cuisinePreference = 'All',
         customCraving = '',
+        servings = 2,
+        dietaryRestriction = 'No Restrictions',
       } = req.body || {};
 
       const itemSummary = Array.isArray(inventory)
         ? inventory
             .map((i: Record<string, unknown>) => `${i.name} (${i.quantity_g || 200}g)`)
             .join(', ')
-        : 'Potato, Fresh Paneer, Eggs, Baby Spinach, Chickpeas, Vine Tomatoes, Poha, Masarepa, Black Beans, Cumin & Turmeric';
+        : 'Potato, Cultured Creamery Butter, Cumin & Turmeric Spices';
 
-      const promptText = `Current Virtual Pantry Inventory: ${itemSummary}.
+      const promptText = `Uploaded Ingredient Photos / Kitchen Inventory: ${itemSummary}.
+Cooking For: ${servings} People.
+Dietary Restriction / Preference: ${dietaryRestriction}.
 Meal-Time Intent Filter: ${mealIntent}.
 Cuisine Focus: ${cuisinePreference}.
 ${customCraving ? `User Custom Request / Craving: ${customCraving}.` : ''}
 
-Using strict Zero-Missing-Ingredient Logic (only the listed inventory items plus water, salt, and standard cooking oil), synthesize 6 practical, high-flavor recipes across Indian, European, and South American cuisines.
-Ensure each recipe includes accurate prep_cook_minutes, total_calories, protein_g, crafting_difficulty (Level 1 to Level 5), used_ingredients, and step-by-step flashcards with timer_seconds for cooking steps.
-Also return the current inventory array intact.`;
+Synthesize 6 practical, beginner-friendly recipes across Breakfast (2), Lunch (2), and Dinner (2) scaled specifically for ${servings} people and strictly respecting "${dietaryRestriction}".
+For EVERY recipe:
+1. List the 'used_ingredients' from the user's uploaded photos.
+2. List 'missing_vegetables': specific additional vegetables or fresh herbs that are lacking from the user's photos to make this dish complete (e.g., Fresh Coriander Leaves, Green Chili, Ripe Tomato, Ginger).
+3. List 'missing_spices': specific additional spices or seasonings that are lacking from the user's photos to cook this dish (e.g., Garam Masala, Black Pepper, Dry Mango Powder, Smoked Paprika).
+4. Include step-by-step flashcards with timer_seconds scaled for ${servings} people.`;
 
       const { text, modelUsed } = await callGeminiWithFallback(promptText);
       const parsed = parseGeminiJson(text);

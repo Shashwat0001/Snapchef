@@ -25,6 +25,15 @@ export type CraftingDifficulty =
   | 'Level 4'
   | 'Level 5';
 
+export type DietaryRestriction =
+  | 'No Restrictions'
+  | 'Vegetarian'
+  | 'Vegan'
+  | 'Gluten-Free'
+  | 'High-Protein'
+  | 'Jain (No Onion/Garlic)'
+  | 'Low-Carb';
+
 export interface MacroProfile {
   protein_g: number;
   carbs_g: number;
@@ -52,6 +61,14 @@ export interface InventoryItem {
   confidence?: number;
 }
 
+export interface CapturedIngredientPhoto {
+  id: string;
+  label: string;
+  previewUrl: string;
+  detectedItems: InventoryItem[];
+  capturedAt: string;
+}
+
 export interface RecipeStep {
   instruction: string;
   timer_seconds: number;
@@ -70,6 +87,10 @@ export interface RecipeItem {
   fat_g?: number;
   crafting_difficulty: CraftingDifficulty | string;
   used_ingredients: string[];
+  missing_vegetables?: string[];
+  missing_spices?: string[];
+  servings?: number;
+  dietary_tags?: string[];
   steps: RecipeStep[];
   chef_note?: string;
 }

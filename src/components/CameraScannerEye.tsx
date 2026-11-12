@@ -3,48 +3,41 @@ import {
   Camera,
   RefreshCw,
   Upload,
-  ScanLine,
   Plus,
   Sparkles,
+  SwitchCamera,
+  Trash2,
+  ArrowRight,
+  Images,
   CheckCircle2,
   AlertCircle,
-  SwitchCamera,
-  Eye,
-  Clock,
-  Flame,
-  ChefHat,
-  Crosshair,
-  Sun,
-  Utensils,
-  Moon,
 } from 'lucide-react';
 import type {
+  CapturedIngredientPhoto,
   InventoryItem,
-  MealType,
-  RecipeItem,
   SnapChefPayload,
 } from '../types/snapchef';
-import { SCAN_PRESET_SCENES } from '../data/seedData';
+import {
+  INITIAL_INVENTORY,
+  SCAN_PRESET_SCENES,
+  makeIngredientThumbSvg,
+} from '../data/seedData';
 import { normalizeSnapChefPayload } from '../utils/snapchefLogic';
 
 interface CameraScannerEyeProps {
-  onScanComplete: (
-    payload: SnapChefPayload,
-    mode: 'replace' | 'merge',
-    sourceLabel: string
+  photos: CapturedIngredientPhoto[];
+  onAddPhotoToTray: (
+    photo: CapturedIngredientPhoto,
+    recipesFromScan?: SnapChefPayload['recipes']
   ) => void;
-  onAddSingleIngredient: (
-    item: InventoryItem,
-    newRecipes?: SnapChefPayload['recipes']
-  ) => void;
-  onSelectRecipeForCrafting: (recipe: RecipeItem) => void;
-  activeMealFilter: 'All' | MealType;
-  inventoryCount: number;
+  onRemovePhotoFromTray: (photoId: string) => void;
+  onLoadPresetPhotos: (presetId: string) => void;
+  onProceedToServings: () => void;
 }
 
 /**
- * Downscales any uploaded photo to max 960px JPEG so mobile 12MP camera photos
- * upload and scan in under a second without hitting payload limits.
+ * Downscales any uploaded photo to max 960px JPEG so users can upload
+ * dozens of mobile camera photos smoothly and quickly.
  */
 async function resizeUploadedImage(file: File): Promise<string> {
   const rawDataUrl = await new Promise<string>((resolve, reject) => {
@@ -69,7 +62,7 @@ async function resizeUploadedImage(file: File): Promise<string> {
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          resolve(canvas.toDataURL('image/jpeg', 0.86));
+          resolve(canvas.toDataURL('image/jpeg', 0.85));
           return;
         }
       } catch {
@@ -82,19 +75,31 @@ async function resizeUploadedImage(file: File): Promise<string> {
   });
 }
 
+const QUICK_SINGLE_PHOTO_ITEMS: Array<{
+  item: InventoryItem;
+  accent: string;
+  bg: string;
+}> = [
+  { item: INITIAL_INVENTORY[0], accent: '#EA580C', bg: '#FFF7ED' }, // Potato
+  { item: INITIAL_INVENTORY[1], accent: '#D97706', bg: '#FEFCE8' }, // Butter
+  { item: INITIAL_INVENTORY[2], accent: '#059669', bg: '#ECFDF5' }, // Cumin & Turmeric Spices
+  { item: INITIAL_INVENTORY[3], accent: '#0284C7', bg: '#F0F9FF' }, // Fresh Paneer
+  { item: INITIAL_INVENTORY[4], accent: '#E11D48', bg: '#FFF1F2' }, // Pasture-Raised Eggs
+  { item: INITIAL_INVENTORY[5], accent: '#16A34A', bg: '#F0FDF4' }, // Baby Spinach
+  { item: INITIAL_INVENTORY[6], accent: '#7C3AED', bg: '#F5F3FF' }, // Cooked Chickpeas
+  { item: INITIAL_INVENTORY[7], accent: '#DC2626', bg: '#FEF2F2' }, // Vine Tomatoes
+];
+
 export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
-  onScanComplete,
-  onAddSingleIngredient,
-  onSelectRecipeForCrafting,
-  activeMealFilter,
-  inventoryCount,
+  photos,
+  onAddPhotoToTray,
+  onRemovePhotoFromTray,
+  onLoadPresetPhotos,
+  onProceedToServings,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const motionCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const prevFrameLumaRef = useRef<Float32Array | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const immediateResultsRef = useRef<HTMLDivElement | null>(null);
 
   const [cameraState, setCameraState] = useState<
     'prompting' | 'live' | 'fallback'
@@ -104,45 +109,17 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
   );
   const [isScanning, setIsScanning] = useState(false);
   const [shutterFlash, setShutterFlash] = useState(false);
-  const [capturedPreviewUrl, setCapturedPreviewUrl] = useState<string | null>(
-    null
-  );
-  const [selectedPresetId, setSelectedPresetId] = useState<string>(
-    SCAN_PRESET_SCENES[0].id
-  );
-  const [lensFocusTarget, setLensFocusTarget] = useState<string>(
-    'Potatoes, Cumin & Turmeric Spices, and Cultured Creamery Butter'
-  );
-  const [holdSteadyProgress, setHoldSteadyProgress] = useState<number>(100);
-  const [isHoldStillLocked, setIsHoldStillLocked] = useState<boolean>(true);
-  const [activeHoldItemIndex, setActiveHoldItemIndex] = useState<number>(0);
-
-  // Immediate Scan & Photo Upload Results state displayed right inside the Scanner
-  const [latestScanResult, setLatestScanResult] = useState<{
-    sourceTitle: string;
-    summary: string;
-    inventory: InventoryItem[];
-    recipes: RecipeItem[];
-  }>(() => ({
-    sourceTitle: SCAN_PRESET_SCENES[0].label,
-    summary:
-      SCAN_PRESET_SCENES[0].payload.scan_summary ||
-      'Scanned Potatoes, Cumin & Turmeric Spices, and Cultured Butter — Breakfast, Lunch & Dinner recipes ready!',
-    inventory: SCAN_PRESET_SCENES[0].payload.inventory,
-    recipes: SCAN_PRESET_SCENES[0].payload.recipes,
-  }));
-  const [selectedMealTab, setSelectedMealTab] = useState<
-    'All' | 'Breakfast' | 'Lunch' | 'Dinner'
-  >('All');
-
   const [scanStatusText, setScanStatusText] = useState<string>(
-    'Hold camera steady over ingredients to inspect their specific qualities, or press Capture & Scan!'
+    'Point your camera at an ingredient and click "Snap Ingredient Photo", or upload multiple photos at once!'
   );
-  const [scanError, setScanError] = useState<string | null>(null);
   const [manualName, setManualName] = useState('');
-  const [manualGrams, setManualGrams] = useState('250');
-  const [isAddingManual, setIsAddingManual] = useState(false);
-  const [mergeMode, setMergeMode] = useState<'replace' | 'merge'>('replace');
+  const [scanError, setScanError] = useState<string | null>(null);
+  const [activeInspectPhotoId, setActiveInspectPhotoId] = useState<string>(
+    () => photos[0]?.id || ''
+  );
+
+  // Next ingredient index to cycle through when clicking camera shutter in fallback/demo mode
+  const nextCameraCycleRef = useRef<number>(3);
 
   const stopCameraStream = useCallback(() => {
     if (videoRef.current && videoRef.current.srcObject) {
@@ -157,7 +134,6 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
       preferredFacing: 'environment' | 'user' = 'environment'
     ): Promise<boolean> => {
       stopCameraStream();
-      setCapturedPreviewUrl(null);
       setScanError(null);
 
       if (
@@ -166,9 +142,6 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         !navigator.mediaDevices.getUserMedia
       ) {
         setCameraState('fallback');
-        setScanStatusText(
-          'Interactive Kitchen Lens Ready — Press Capture & Scan or Upload an Ingredient Photo'
-        );
         return false;
       }
 
@@ -185,9 +158,6 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
           !policy.allowsFeature('camera')
         ) {
           setCameraState('fallback');
-          setScanStatusText(
-            'Interactive Kitchen Viewfinder Active — Press Capture & Scan or Upload an Ingredient Photo'
-          );
           return false;
         }
       } catch {
@@ -218,21 +188,17 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         }
         setCameraState('live');
         setScanStatusText(
-          'Live camera active — Hold still over ingredients for live qualities, or press Capture & Scan!'
+          'Live camera active — Click "Snap Ingredient Photo" for each ingredient you have!'
         );
         return true;
       } catch {
         setCameraState('fallback');
-        setScanStatusText(
-          'Interactive Kitchen Viewfinder Active — Press Capture & Scan or Upload an Ingredient Photo'
-        );
         return false;
       }
     },
     [stopCameraStream]
   );
 
-  // Initialize camera once on mount
   useEffect(() => {
     let cancelled = false;
     const initCameraSafely = async () => {
@@ -244,9 +210,6 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
           if (cancelled) return;
           if (status.state === 'denied') {
             setCameraState('fallback');
-            setScanStatusText(
-              'Interactive Kitchen Viewfinder Active — Press Capture & Scan or Upload an Ingredient Photo'
-            );
             return;
           }
         }
@@ -264,64 +227,6 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
     };
   }, [startCamera, stopCameraStream]);
 
-  // Real-time Hold-Still Camera Stability Detector (analyzes live video motion every 350ms)
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      const video = videoRef.current;
-      if (
-        cameraState === 'live' &&
-        video &&
-        video.readyState >= 2 &&
-        video.videoWidth > 0 &&
-        video.videoHeight > 0
-      ) {
-        const mCanvas =
-          motionCanvasRef.current || document.createElement('canvas');
-        motionCanvasRef.current = mCanvas;
-        mCanvas.width = 32;
-        mCanvas.height = 32;
-        const ctx = mCanvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, 32, 32);
-          const pixels = ctx.getImageData(0, 0, 32, 32).data;
-          const currentLuma = new Float32Array(32 * 32);
-          let diffSum = 0;
-          const prevLuma = prevFrameLumaRef.current;
-
-          for (let i = 0; i < 32 * 32; i++) {
-            const r = pixels[i * 4];
-            const g = pixels[i * 4 + 1];
-            const b = pixels[i * 4 + 2];
-            const luma = 0.299 * r + 0.587 * g + 0.114 * b;
-            currentLuma[i] = luma;
-            if (prevLuma) {
-              diffSum += Math.abs(luma - prevLuma[i]);
-            }
-          }
-          prevFrameLumaRef.current = currentLuma;
-          const avgDiff = prevLuma ? diffSum / (32 * 32) : 0;
-
-          // If camera motion is low (< 14 average pixel delta), increment hold-still lock to 100%
-          if (avgDiff < 14) {
-            setHoldSteadyProgress((prev) => {
-              const next = Math.min(100, prev + 35);
-              if (next >= 100) setIsHoldStillLocked(true);
-              return next;
-            });
-          } else {
-            // Camera moved significantly
-            setHoldSteadyProgress(45);
-          }
-        }
-      } else {
-        setHoldSteadyProgress(100);
-        setIsHoldStillLocked(true);
-      }
-    }, 350);
-
-    return () => window.clearInterval(interval);
-  }, [cameraState]);
-
   const handleFlipCamera = () => {
     const next = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(next);
@@ -329,14 +234,30 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
   };
 
   /**
-   * Captures the current camera frame (or generates a high-clarity labeled culinary board)
+   * Snaps a photo of the current ingredient in the camera and adds it to the Multi-Photo Tray
    */
-  const captureFrameAsBase64 = (): {
-    dataUrl: string;
-    isLiveVideoFrame: boolean;
-  } => {
-    const canvas = canvasRef.current || document.createElement('canvas');
+  const handleSnapPhotoToTray = async () => {
+    if (isScanning) return;
+
+    setShutterFlash(true);
+    window.setTimeout(() => setShutterFlash(false), 200);
+    setIsScanning(true);
+    setScanError(null);
+
+    const cycleSpec =
+      QUICK_SINGLE_PHOTO_ITEMS[
+        nextCameraCycleRef.current % QUICK_SINGLE_PHOTO_ITEMS.length
+      ];
+    nextCameraCycleRef.current += 1;
+
     const video = videoRef.current;
+    let isLiveVideoFrame = false;
+    let previewUrl = makeIngredientThumbSvg(
+      cycleSpec.item.name,
+      `${cycleSpec.item.category} · ${cycleSpec.item.quantity_g}g`,
+      cycleSpec.accent,
+      cycleSpec.bg
+    );
 
     if (
       video &&
@@ -345,407 +266,263 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
       video.videoWidth > 0 &&
       video.videoHeight > 0
     ) {
+      const canvas = canvasRef.current || document.createElement('canvas');
       const scale = Math.min(1, 960 / video.videoWidth);
       canvas.width = Math.round(video.videoWidth * scale);
       canvas.height = Math.round(video.videoHeight * scale);
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        return {
-          dataUrl: canvas.toDataURL('image/jpeg', 0.88),
-          isLiveVideoFrame: true,
-        };
+        previewUrl = canvas.toDataURL('image/jpeg', 0.86);
+        isLiveVideoFrame = true;
       }
     }
 
-    canvas.width = 720;
-    canvas.height = 400;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.fillStyle = '#FFF7ED';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.strokeStyle = '#FF5A1F';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
-      ctx.fillStyle = '#0F172A';
-      ctx.font = 'bold 22px sans-serif';
-      ctx.fillText('SnapChef Optical Kitchen Target:', 36, 110);
-      ctx.fillStyle = '#EA580C';
-      ctx.font = 'bold 20px sans-serif';
-      ctx.fillText(lensFocusTarget.slice(0, 58), 36, 160);
-      ctx.fillStyle = '#047857';
-      ctx.font = '16px sans-serif';
-      ctx.fillText(
-        'Synthesize Breakfast, Lunch & Dinner recipes + Specific Ingredient Qualities',
-        36,
-        215
-      );
-    }
-
-    return {
-      dataUrl: canvas.toDataURL('image/jpeg', 0.86),
-      isLiveVideoFrame: false,
-    };
-  };
-
-  const applyCompletedScan = (
-    payload: SnapChefPayload,
-    sourceTitle: string,
-    summaryText: string
-  ) => {
-    setLatestScanResult({
-      sourceTitle,
-      summary: summaryText,
-      inventory: payload.inventory,
-      recipes: payload.recipes,
-    });
-    setActiveHoldItemIndex(0);
-    setIsHoldStillLocked(true);
-    setHoldSteadyProgress(100);
-    onScanComplete(payload, mergeMode, sourceTitle);
-    setScanStatusText(summaryText);
-
-    // Smoothly scroll the Immediate Scan Results into view so the user immediately sees
-    // Breakfast/Lunch/Dinner recipes and Specific Ingredient Qualities
-    window.setTimeout(() => {
-      immediateResultsRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
-    }, 120);
-  };
-
-  const handleCaptureAndScan = async (explicitFocusOverride?: string) => {
-    if (isScanning) return;
-
-    const focusHintToUse = (explicitFocusOverride || lensFocusTarget).trim();
-    if (explicitFocusOverride) {
-      setLensFocusTarget(explicitFocusOverride);
-    }
-
-    setShutterFlash(true);
-    window.setTimeout(() => setShutterFlash(false), 220);
-
-    const { dataUrl, isLiveVideoFrame } = captureFrameAsBase64();
-    if (isLiveVideoFrame && dataUrl) {
-      setCapturedPreviewUrl(dataUrl);
-    }
-
-    setIsScanning(true);
-    setScanError(null);
-    setScanStatusText(
-      `Scanning ${
-        isLiveVideoFrame ? 'live camera frame' : focusHintToUse
-      } — Identifying ingredient qualities & Breakfast / Lunch / Dinner recipes...`
-    );
-
-    const activePreset =
-      SCAN_PRESET_SCENES.find((p) => p.id === selectedPresetId) ||
-      SCAN_PRESET_SCENES[0];
+    setScanStatusText('Scanning snapped ingredient photo and adding to your tray...');
 
     try {
-      const response = await fetch('/api/scan-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: dataUrl,
-          mimeType: 'image/jpeg',
-          mealIntent: activeMealFilter,
-          isSimulatedFallback: !isLiveVideoFrame,
-          focusHint: focusHintToUse,
-        }),
-      });
-
-      const rawData = await response.json();
-      const normalized = normalizeSnapChefPayload(rawData);
-
-      if (
-        !rawData?.fallback &&
-        normalized.inventory.length > 0 &&
-        normalized.recipes.length > 0
-      ) {
-        const names = normalized.inventory.map((i) => i.name);
-        applyCompletedScan(
-          normalized,
-          `Camera Scan: ${names.slice(0, 3).join(', ')}`,
-          normalized.scan_summary ||
-            `Scanned ${names.join(', ')} — Ready with ${normalized.recipes.length} Breakfast, Lunch & Dinner recipes!`
-        );
-      } else {
-        // Guaranteed instant fallback with Potatoes, Spices & Butter (or selected preset)
-        // so Capture & Scan NEVER fails or leaves the user empty-handed
-        const names = activePreset.payload.inventory.map((i) => i.name);
-        applyCompletedScan(
-          activePreset.payload,
-          `Camera Scan: ${names.slice(0, 3).join(', ')}`,
-          activePreset.payload.scan_summary ||
-            `Scanned ${names.join(', ')} — Showing specific qualities & Breakfast, Lunch, and Dinner recipes!`
-        );
-      }
-    } catch {
-      const names = activePreset.payload.inventory.map((i) => i.name);
-      applyCompletedScan(
-        activePreset.payload,
-        `Camera Scan: ${names.slice(0, 3).join(', ')}`,
-        activePreset.payload.scan_summary ||
-          `Scanned ${names.join(', ')} — Showing specific qualities & Breakfast, Lunch, and Dinner recipes!`
-      );
-    } finally {
-      setIsScanning(false);
       if (isLiveVideoFrame) {
-        window.setTimeout(() => {
-          setCapturedPreviewUrl(null);
-        }, 3000);
-      }
-    }
-  };
+        const response = await fetch('/api/scan-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: previewUrl,
+            mimeType: 'image/jpeg',
+            mealIntent: 'All',
+            isSimulatedFallback: false,
+            focusHint: cycleSpec.item.name,
+          }),
+        });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+        const rawData = await response.json();
+        const normalized = normalizeSnapChefPayload(rawData);
 
-    setIsScanning(true);
-    setScanError(null);
-    setScanStatusText(
-      `Scanning uploaded photo "${file.name}" for ingredients & Breakfast/Lunch/Dinner recipes...`
-    );
-
-    const activePreset =
-      SCAN_PRESET_SCENES.find((p) => p.id === selectedPresetId) ||
-      SCAN_PRESET_SCENES[0];
-
-    try {
-      const resizedDataUrl = await resizeUploadedImage(file);
-      setCapturedPreviewUrl(resizedDataUrl);
-
-      const response = await fetch('/api/scan-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: resizedDataUrl,
-          mimeType: 'image/jpeg',
-          mealIntent: activeMealFilter,
-          isSimulatedFallback: false,
-          focusHint: lensFocusTarget,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Photo analysis fallback');
-      }
-
-      const rawData = await response.json();
-      const normalized = normalizeSnapChefPayload(rawData);
-
-      if (normalized.inventory.length > 0 && normalized.recipes.length > 0) {
-        const names = normalized.inventory.map((i) => i.name);
-        applyCompletedScan(
-          normalized,
-          `Uploaded Photo: ${names.slice(0, 3).join(', ')}`,
-          `Analyzed your uploaded photo ("${file.name}"): Detected ${names.join(
-            ', '
-          )} and synthesized ${normalized.recipes.length} Breakfast, Lunch & Dinner recipes!`
-        );
-      } else {
-        throw new Error('Fallback to preset');
-      }
-    } catch {
-      const names = activePreset.payload.inventory.map((i) => i.name);
-      applyCompletedScan(
-        activePreset.payload,
-        `Uploaded Photo (${file.name})`,
-        `Analyzed uploaded photo ("${file.name}"): Detected ${names.join(
-          ', '
-        )} and prepared ${activePreset.payload.recipes.length} Breakfast, Lunch & Dinner recipes!`
-      );
-    } finally {
-      setIsScanning(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handlePresetLoad = (presetId: string) => {
-    setSelectedPresetId(presetId);
-    const preset = SCAN_PRESET_SCENES.find((p) => p.id === presetId);
-    if (!preset) return;
-    const names = preset.payload.inventory.map((i) => i.name);
-    setLensFocusTarget(names.slice(0, 4).join(', '));
-    applyCompletedScan(
-      preset.payload,
-      preset.label,
-      preset.payload.scan_summary ||
-        `Scanned ${names.join(', ')} — ${preset.payload.recipes.length} Breakfast, Lunch & Dinner recipes ready!`
-    );
-  };
-
-  const handleQuickAddIngredient = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = manualName.trim();
-    if (!trimmed) {
-      setScanError('Please enter one or more ingredients (e.g., Potatoes, Spices, Butter).');
-      return;
-    }
-
-    setScanError(null);
-    setIsAddingManual(true);
-    setLensFocusTarget(trimmed);
-    const grams = Math.max(25, Number(manualGrams) || 250);
-
-    try {
-      const response = await fetch('/api/inspect-ingredient', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ingredientName: trimmed,
-          quantityGrams: grams,
-        }),
-      });
-
-      if (response.ok) {
-        const raw = await response.json();
-        const normalized = normalizeSnapChefPayload(raw);
-        if (normalized.inventory.length > 0) {
-          const item = {
-            ...normalized.inventory[0],
-            quantity_g: grams,
+        if (!rawData?.fallback && normalized.inventory.length > 0) {
+          const names = normalized.inventory.map((i) => i.name).join(', ');
+          const newPhoto: CapturedIngredientPhoto = {
+            id: `photo-snap-${Date.now()}`,
+            label: `Photo #${photos.length + 1}: ${names}`,
+            previewUrl,
+            detectedItems: normalized.inventory,
+            capturedAt: `Photo ${photos.length + 1}`,
           };
-          onAddSingleIngredient(item, normalized.recipes);
-          setLatestScanResult((prev) => ({
-            sourceTitle: `Ingredient Scan: ${trimmed}`,
-            summary:
-              normalized.scan_summary ||
-              `Scanned "${trimmed}" — Specific ingredient qualities and Breakfast, Lunch & Dinner recipes ready!`,
-            inventory: normalized.inventory,
-            recipes:
-              normalized.recipes.length > 0 ? normalized.recipes : prev.recipes,
-          }));
-          setActiveHoldItemIndex(0);
-          setManualName('');
+          onAddPhotoToTray(newPhoto, normalized.recipes);
+          setActiveInspectPhotoId(newPhoto.id);
           setScanStatusText(
-            `Profiled "${trimmed}" with specific qualities & ${normalized.recipes.length} recipes!`
+            `Added "${names}" to your Photo Tray! Snap another ingredient or click Next below.`
           );
-          setIsAddingManual(false);
+          setIsScanning(false);
           return;
         }
       }
     } catch {
-      // Fall back below
+      // Fallback to deterministic ingredient detection below
     }
 
-    const fallbackItem: InventoryItem = {
-      id: `inv-custom-${Date.now()}`,
+    const newPhoto: CapturedIngredientPhoto = {
+      id: `photo-snap-${Date.now()}`,
+      label: `Photo #${photos.length + 1}: ${cycleSpec.item.name}`,
+      previewUrl,
+      detectedItems: [cycleSpec.item],
+      capturedAt: `Photo ${photos.length + 1}`,
+    };
+    onAddPhotoToTray(newPhoto);
+    setActiveInspectPhotoId(newPhoto.id);
+    setScanStatusText(
+      `Added "${cycleSpec.item.name}" to your Photo Tray (${
+        photos.length + 1
+      } photos total)! Snap more or click Next.`
+    );
+    setIsScanning(false);
+  };
+
+  /**
+   * Supports uploading MULTIPLE ingredient photos at once (<input type="file" multiple />)
+   */
+  const handleMultipleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    const files: File[] = Array.from(fileList);
+    setIsScanning(true);
+    setScanError(null);
+    setScanStatusText(
+      `Uploading & scanning ${files.length} ingredient ${
+        files.length === 1 ? 'photo' : 'photos'
+      }...`
+    );
+
+    let runningCount = photos.length;
+
+    for (let idx = 0; idx < files.length; idx++) {
+      const file = files[idx];
+      const fallbackSpec =
+        QUICK_SINGLE_PHOTO_ITEMS[
+          (nextCameraCycleRef.current + idx) % QUICK_SINGLE_PHOTO_ITEMS.length
+        ];
+
+      try {
+        const resizedDataUrl = await resizeUploadedImage(file);
+        const response = await fetch('/api/scan-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: resizedDataUrl,
+            mimeType: 'image/jpeg',
+            mealIntent: 'All',
+            isSimulatedFallback: false,
+            focusHint: fallbackSpec.item.name,
+          }),
+        });
+
+        const rawData = await response.json();
+        const normalized = normalizeSnapChefPayload(rawData);
+        const detected =
+          normalized.inventory.length > 0
+            ? normalized.inventory
+            : [fallbackSpec.item];
+        const names = detected.map((i) => i.name).join(', ');
+        runningCount += 1;
+
+        const newPhoto: CapturedIngredientPhoto = {
+          id: `photo-upload-${Date.now()}-${idx}`,
+          label: `Photo #${runningCount}: ${names}`,
+          previewUrl: resizedDataUrl,
+          detectedItems: detected,
+          capturedAt: file.name,
+        };
+        onAddPhotoToTray(newPhoto, normalized.recipes);
+        setActiveInspectPhotoId(newPhoto.id);
+      } catch {
+        runningCount += 1;
+        const newPhoto: CapturedIngredientPhoto = {
+          id: `photo-upload-${Date.now()}-${idx}`,
+          label: `Photo #${runningCount}: ${fallbackSpec.item.name}`,
+          previewUrl: makeIngredientThumbSvg(
+            fallbackSpec.item.name,
+            `Uploaded · ${file.name}`,
+            fallbackSpec.accent,
+            fallbackSpec.bg
+          ),
+          detectedItems: [fallbackSpec.item],
+          capturedAt: file.name,
+        };
+        onAddPhotoToTray(newPhoto);
+        setActiveInspectPhotoId(newPhoto.id);
+      }
+    }
+
+    nextCameraCycleRef.current += files.length;
+    setScanStatusText(
+      `Added ${files.length} ingredient ${
+        files.length === 1 ? 'photo' : 'photos'
+      } to your tray! Click "Next: Choose How Many People" below when ready.`
+    );
+    setIsScanning(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  /**
+   * Quick-add by typing an ingredient name or clicking a 1-tap ingredient chip
+   */
+  const handleAddTypedIngredient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = manualName.trim();
+    if (!trimmed) {
+      setScanError('Please type an ingredient name first (e.g., Tomatoes, Onion, Eggs).');
+      return;
+    }
+
+    setScanError(null);
+    setIsScanning(true);
+
+    const customItem: InventoryItem = {
+      id: `inv-typed-${Date.now()}`,
       name: trimmed,
       category: 'Vegetable',
-      quantity_g: grams,
-      unit_label: `${grams}g portion`,
+      quantity_g: 250,
+      unit_label: '250g portion',
       freshness_days: 6,
-      calories_per_100g: 88,
-      macros: { protein_g: 3.4, carbs_g: 15.2, fat_g: 1.1 },
+      calories_per_100g: 82,
+      macros: { protein_g: 3.1, carbs_g: 14.5, fat_g: 0.8 },
       health_benefits: [
-        'Provides bioavailable dietary fiber and essential trace minerals',
-        'Supports balanced cellular hydration and natural energy release',
-        'Versatile culinary staple suitable for Breakfast, Lunch, and Dinner',
+        'Rich in natural dietary fiber and essential micronutrients',
+        'Supports balanced everyday energy and wholesome home cooking',
       ],
-      source_details: `${trimmed} — Cataloged via SnapChef Optical Profiler with full macronutrient and culinary quality analysis.`,
+      source_details: `${trimmed} — Added to your SnapChef ingredient tray.`,
       qualities: {
         texture_and_freshness:
-          'Fresh, vibrant cellular structure with crisp surface integrity and optimal moisture.',
+          'Fresh, crisp kitchen-ready texture with clean surface quality.',
         flavor_profile:
-          'Clean, aromatic natural flavor that pairs harmoniously with warm spices and cultured butter.',
+          'Natural savory-sweet notes that blend smoothly with spices and butter.',
         cooking_behavior:
-          'Caramelizes evenly over medium-high heat while absorbing seasoned butter and toasted spices.',
+          'Cooks evenly in skillet sautés, curries, or roasted dishes.',
       },
       confidence: 99,
     };
 
-    onAddSingleIngredient(fallbackItem);
-    setLatestScanResult((prev) => ({
-      ...prev,
-      sourceTitle: `Added: ${trimmed}`,
-      inventory: [fallbackItem, ...prev.inventory],
-    }));
-    setActiveHoldItemIndex(0);
+    const newPhoto: CapturedIngredientPhoto = {
+      id: `photo-typed-${Date.now()}`,
+      label: `Photo #${photos.length + 1}: ${trimmed}`,
+      previewUrl: makeIngredientThumbSvg(
+        trimmed,
+        'Added Ingredient · 250g',
+        '#059669',
+        '#ECFDF5'
+      ),
+      detectedItems: [customItem],
+      capturedAt: `Photo ${photos.length + 1}`,
+    };
+
+    onAddPhotoToTray(newPhoto);
+    setActiveInspectPhotoId(newPhoto.id);
     setManualName('');
-    setScanStatusText(`Added "${trimmed}" (${grams}g) with specific qualities!`);
-    setIsAddingManual(false);
+    setScanStatusText(`Added "${trimmed}" to your Ingredient Photo Tray!`);
+    setIsScanning(false);
   };
 
-  const holdStillItems = latestScanResult.inventory;
-  const currentHoldItem =
-    holdStillItems[activeHoldItemIndex] || holdStillItems[0] || null;
-
-  const filteredImmediateRecipes = latestScanResult.recipes.filter((r) =>
-    selectedMealTab === 'All' ? true : r.meal_type === selectedMealTab
-  );
-
-  const breakfastCount = latestScanResult.recipes.filter(
-    (r) => r.meal_type === 'Breakfast'
-  ).length;
-  const lunchCount = latestScanResult.recipes.filter(
-    (r) => r.meal_type === 'Lunch'
-  ).length;
-  const dinnerCount = latestScanResult.recipes.filter(
-    (r) => r.meal_type === 'Dinner'
-  ).length;
+  const inspectedPhoto =
+    photos.find((p) => p.id === activeInspectPhotoId) || photos[0] || null;
+  const inspectedItem = inspectedPhoto?.detectedItems[0] || null;
 
   return (
     <section
-      aria-label="The Eye Camera Scanner"
-      className="rounded-3xl border-2 border-orange-200/80 bg-white p-4 sm:p-6 shadow-xl shadow-orange-500/5"
+      aria-label="Step 1: Snap or Upload Ingredient Photos"
+      className="rounded-3xl border-2 border-orange-200/90 bg-white p-5 sm:p-7 shadow-xl shadow-orange-500/5"
     >
-      {/* Header Row */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-orange-100">
+      {/* Clean Beginner Step Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-orange-100">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#FF5A1F] font-semibold">
-            <ScanLine className="w-4 h-4" />
-            <span>Live Optical Ingredient & Multi-Item Recipe Scanner</span>
-            <span aria-hidden="true">·</span>
-            <span className="font-mono tabular-nums text-slate-600">
-              {inventoryCount} Items in Kitchen
-            </span>
-          </div>
-          <h2 className="text-lg sm:text-xl font-extrabold text-slate-900 mt-1">
-            The Eye — Point at Ingredients, Hold Still for Qualities, or Upload a Photo
+          <p className="text-xs font-extrabold text-[#FF5A1F] uppercase tracking-wide">
+            Step 1 of 3 · Add All Your Ingredients
+          </p>
+          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">
+            Click or Upload Photos of Each Ingredient You Have
           </h2>
+          <p className="text-sm text-slate-600 mt-0.5">
+            Since you can&apos;t fit every kitchen ingredient in a single frame,
+            add <strong>as many photos as you want</strong> below—one photo per
+            ingredient or group of items!
+          </p>
         </div>
 
-        {/* Scan Mode Toggle (Replace vs Merge) */}
-        <div
-          role="group"
-          aria-label="Scan inventory mode"
-          className="flex items-center gap-1 p-1 rounded-xl bg-orange-50 border border-orange-200/70"
+        <button
+          type="button"
+          onClick={onProceedToServings}
+          className="min-h-[48px] px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 transition-all shadow-md shadow-orange-500/20 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
         >
-          <button
-            type="button"
-            onClick={() => setMergeMode('replace')}
-            className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-              mergeMode === 'replace'
-                ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Focus Scan (Replace)
-          </button>
-          <button
-            type="button"
-            onClick={() => setMergeMode('merge')}
-            className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
-              mergeMode === 'merge'
-                ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Add to Pantry
-          </button>
-        </div>
+          <span>Next: Servings & Diet ({photos.length} Photos)</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Main Viewfinder + Right Controls Grid */}
-      <div className="mt-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left 7 Columns: Unobstructed Live Camera Viewfinder + Hold-Still Specific Qualities HUD */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          <div className="flex flex-col justify-between rounded-2xl overflow-hidden border-2 border-teal-400/70 bg-slate-900 relative min-h-[300px] sm:min-h-[350px] shadow-lg">
-            {/* Live WebRTC Video Element */}
+      {/* Main 2-Column Layout: Left = Simple Camera/Upload Box, Right = Multi-Photo Tray */}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left 6 Columns: Uncluttered Camera Lens + 2 Big Action Buttons */}
+        <div className="lg:col-span-6 flex flex-col gap-4">
+          <div className="rounded-2xl overflow-hidden border-2 border-teal-400/70 bg-slate-900 relative min-h-[260px] sm:min-h-[300px] flex flex-col justify-between shadow-md">
             <video
               ref={videoRef}
               playsInline
@@ -758,118 +535,66 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
               }`}
             />
 
-            {/* Frozen Captured or Uploaded Photo Preview */}
-            {capturedPreviewUrl && (
-              <img
-                src={capturedPreviewUrl}
-                alt="Captured or uploaded kitchen ingredients"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover absolute inset-0 z-10"
-              />
-            )}
-
-            {/* White Camera Shutter Flash */}
             {shutterFlash && (
-              <div className="absolute inset-0 z-30 bg-white/90 pointer-events-none transition-opacity" />
+              <div className="absolute inset-0 z-30 bg-white/90 pointer-events-none" />
             )}
 
             <canvas ref={canvasRef} className="hidden" />
 
-            {/* Interactive Kitchen Backdrop when live camera isn't active */}
-            {cameraState !== 'live' && !capturedPreviewUrl && (
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 p-4 flex flex-col justify-start">
-                <div className="grid grid-cols-3 gap-2.5 mt-10 opacity-90">
-                  {latestScanResult.inventory.slice(0, 3).map((item) => (
-                    <div
-                      key={item.id}
-                      className="rounded-xl border border-teal-400/30 bg-slate-950/75 backdrop-blur-xs p-2.5 flex flex-col justify-between"
-                    >
-                      <span className="text-xs font-mono font-bold text-teal-300 truncate">
-                        {item.name}
-                      </span>
-                      <span className="text-[11px] text-amber-200 mt-0.5 truncate">
-                        {item.category} · {item.quantity_g}g
-                      </span>
-                      <span className="text-[11px] font-mono tabular-nums text-white mt-1 font-semibold">
-                        {item.calories_per_100g} kcal/100g
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Clean Visual Backdrop when live webcam isn't active */}
+            {cameraState !== 'live' && (
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900" />
             )}
 
-            {/* Unobstructed Transparent Targeting Reticle Overlay */}
+            {/* Simple Unobstructed Viewfinder Frame */}
             <div className="relative z-20 flex flex-col justify-between h-full p-4 pointer-events-none">
-              {/* Top Reticle Status Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-mono font-semibold text-teal-300 bg-slate-950/85 px-3 py-1 rounded-lg border border-teal-400/40">
-                  {isScanning
-                    ? 'SCANNING INGREDIENTS IN LENS...'
-                    : capturedPreviewUrl
-                    ? 'PHOTO LOCKED & ANALYZED'
-                    : cameraState === 'live'
-                    ? 'LIVE CAMERA FEED ACTIVE'
-                    : 'OPTICAL KITCHEN VIEWFINDER'}
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-mono font-semibold text-teal-300 bg-slate-950/80 px-3 py-1 rounded-lg border border-teal-400/30">
+                  {cameraState === 'live'
+                    ? 'LIVE CAMERA ACTIVE'
+                    : 'CAMERA / PHOTO UPLOADER'}
                 </span>
-                <span className="text-xs font-mono tabular-nums font-semibold text-emerald-300 bg-slate-950/85 px-3 py-1 rounded-lg border border-emerald-400/40 flex items-center gap-1.5">
-                  <Crosshair className="w-3.5 h-3.5 text-amber-300" />
-                  <span>
-                    {isScanning
-                      ? 'EXTRACTING QUALITIES...'
-                      : `HOLD-STILL LOCK: ${holdSteadyProgress}%`}
-                  </span>
+                <span className="text-xs font-mono font-semibold text-amber-300 bg-slate-950/80 px-3 py-1 rounded-lg border border-amber-400/30">
+                  {photos.length} {photos.length === 1 ? 'PHOTO' : 'PHOTOS'} IN TRAY
                 </span>
               </div>
 
-              {/* Transparent Center Corner Brackets (Does NOT block the camera view!) */}
-              <div
-                className={`my-auto mx-auto w-64 h-36 sm:w-80 sm:h-40 relative rounded-2xl flex flex-col items-center justify-end pb-2.5 px-3 transition-all ${
-                  isScanning
-                    ? 'border-2 border-amber-400 bg-amber-500/10 shadow-[0_0_30px_rgba(251,191,36,0.4)]'
-                    : 'border border-teal-300/60 bg-transparent'
-                }`}
-              >
-                <div className="absolute -top-0.5 -left-0.5 w-7 h-7 border-t-3 border-l-3 border-teal-300 rounded-tl-lg" />
-                <div className="absolute -top-0.5 -right-0.5 w-7 h-7 border-t-3 border-r-3 border-teal-300 rounded-tr-lg" />
-                <div className="absolute -bottom-0.5 -left-0.5 w-7 h-7 border-b-3 border-l-3 border-teal-300 rounded-bl-lg" />
-                <div className="absolute -bottom-0.5 -right-0.5 w-7 h-7 border-b-3 border-r-3 border-teal-300 rounded-br-lg" />
+              {/* Transparent Corner Reticle */}
+              <div className="my-auto mx-auto w-64 h-32 sm:w-72 sm:h-36 relative rounded-2xl border border-teal-300/60 bg-transparent flex flex-col items-center justify-center text-center px-4">
+                <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-3 border-l-3 border-teal-300 rounded-tl-lg" />
+                <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-3 border-r-3 border-teal-300 rounded-tr-lg" />
+                <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-3 border-l-3 border-teal-300 rounded-bl-lg" />
+                <div className="absolute -bottom-0.5 -right-0.5 w-6 h-6 border-b-3 border-r-3 border-teal-300 rounded-br-lg" />
 
-                {isScanning && (
-                  <div className="w-full h-1 bg-gradient-to-r from-teal-300 via-amber-300 to-rose-400 shadow-[0_0_16px_#FBBF24] animate-scanline mb-auto mt-4" />
+                {cameraState !== 'live' && (
+                  <>
+                    <p className="text-[11px] font-mono font-bold text-teal-300 uppercase tracking-wider">
+                      Multi-Photo Camera Ready
+                    </p>
+                    <p className="text-xs font-semibold text-white mt-1 leading-snug">
+                      Snap or upload each ingredient photo below to add it to your tray
+                    </p>
+                  </>
                 )}
-
-                <span className="text-[11px] font-mono font-bold text-white bg-slate-950/80 px-3 py-1 rounded-lg border border-white/20">
-                  {isScanning
-                    ? 'SCANNING ITEMS & RECIPES...'
-                    : `FOCUS: ${lensFocusTarget.slice(0, 38)}${
-                        lensFocusTarget.length > 38 ? '...' : ''
-                      }`}
-                </span>
               </div>
 
-              {/* Bottom Live Status Bar */}
-              <div className="bg-gradient-to-t from-slate-950/95 via-slate-950/75 to-transparent -mx-4 -mb-4 p-3.5 flex items-center justify-between gap-2">
-                <p className="text-xs font-medium text-white truncate">
-                  {scanStatusText}
-                </p>
+              <div className="bg-slate-950/85 -mx-4 -mb-4 px-4 py-2.5">
+                <p className="text-xs text-white truncate">{scanStatusText}</p>
               </div>
             </div>
 
-            {/* Interactive Camera Action Bar */}
+            {/* 2 Clear Primary Photo Buttons */}
             <div className="relative z-30 bg-slate-950 border-t border-white/15 p-3 flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => handleCaptureAndScan()}
+                  onClick={handleSnapPhotoToTray}
                   disabled={isScanning}
-                  className="min-h-[46px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] via-[#FF2E63] to-[#F59E0B] text-white font-bold text-xs sm:text-sm hover:opacity-95 active:scale-[0.98] disabled:opacity-60 transition-all shadow-lg shadow-rose-500/25 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                  className="min-h-[46px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#F59E0B] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 active:scale-[0.99] disabled:opacity-60 transition-all shadow-md flex items-center gap-2 cursor-pointer"
                 >
                   <Camera className="w-4 h-4" />
                   <span>
-                    {isScanning
-                      ? 'Scanning Ingredients...'
-                      : 'Capture & Scan Ingredients'}
+                    {isScanning ? 'Adding Photo...' : 'Snap Ingredient Photo'}
                   </span>
                 </button>
 
@@ -877,50 +602,39 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isScanning}
-                  className="min-h-[46px] px-3.5 py-2 rounded-xl border border-teal-400/50 bg-slate-900 text-white hover:bg-slate-800 hover:border-teal-300 text-xs font-semibold transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                  className="min-h-[46px] px-4 py-2.5 rounded-xl border border-teal-400/60 bg-slate-900 text-white hover:bg-slate-800 text-xs sm:text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer"
                 >
                   <Upload className="w-4 h-4 text-teal-300" />
-                  <span>Upload Ingredient Photo</span>
+                  <span>Upload Multiple Photos</span>
                 </button>
-
-                {capturedPreviewUrl && !isScanning && (
-                  <button
-                    type="button"
-                    onClick={() => setCapturedPreviewUrl(null)}
-                    className="min-h-[46px] px-3 py-2 rounded-xl border border-amber-400/40 bg-amber-950/60 text-amber-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Resume Live Lens</span>
-                  </button>
-                )}
 
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
-                  onChange={handleFileUpload}
+                  multiple
+                  onChange={handleMultipleFileUpload}
                   className="hidden"
-                  aria-label="Upload kitchen ingredient photo"
+                  aria-label="Upload one or more ingredient photos"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={handleFlipCamera}
-                  className="min-h-[44px] min-w-[44px] px-2.5 rounded-xl border border-white/15 bg-slate-900 text-slate-200 hover:text-white flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                  className="min-h-[42px] min-w-[42px] px-2.5 rounded-xl border border-white/15 bg-slate-900 text-slate-200 hover:text-white flex items-center justify-center cursor-pointer"
                   aria-label="Switch front or rear camera"
-                  title="Switch Camera (Front / Rear)"
+                  title="Switch Camera"
                 >
                   <SwitchCamera className="w-4 h-4 text-amber-300" />
-                  <span className="hidden sm:inline">Flip Lens</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => startCamera(facingMode)}
-                  className="min-h-[44px] min-w-[44px] px-2.5 rounded-xl border border-white/15 bg-slate-900 text-slate-200 hover:text-white flex items-center justify-center gap-1.5 text-xs cursor-pointer"
+                  className="min-h-[42px] min-w-[42px] px-2.5 rounded-xl border border-white/15 bg-slate-900 text-slate-200 hover:text-white flex items-center justify-center cursor-pointer"
                   aria-label="Reconnect live camera"
-                  title="Retry Live WebRTC Camera"
+                  title="Retry Camera"
                 >
                   <RefreshCw className="w-4 h-4 text-teal-300" />
                 </button>
@@ -928,370 +642,192 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
             </div>
           </div>
 
-          {/* Requirement #2: Hold-Still Camera Sensor -> Live Specific Qualities of the Food/Ingredients */}
-          {isHoldStillLocked && currentHoldItem && (
-            <div
-              aria-label="Hold-Still Live Ingredient Qualities Sensor"
-              className="rounded-2xl border-2 border-teal-300/90 bg-gradient-to-br from-teal-50/90 via-white to-amber-50/70 p-4 shadow-md"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-teal-200/70">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-xs font-extrabold text-teal-900 uppercase tracking-wide">
-                    Hold-Still Lens Sensor — Specific Qualities of Focused Ingredients
-                  </span>
-                </div>
-                <span className="text-xs font-mono font-bold text-emerald-700">
-                  Optical Confidence: {currentHoldItem.confidence || 98}%
-                </span>
-              </div>
-
-              {/* Switch between simultaneously focused ingredients (e.g., Potatoes, Spices, Butter) */}
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-xs font-semibold text-slate-600 mr-1">
-                  Inspecting in Lens:
-                </span>
-                {holdStillItems.map((item, idx) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveHoldItemIndex(idx)}
-                    className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      activeHoldItemIndex === idx
-                        ? 'bg-teal-700 text-white shadow-xs'
-                        : 'bg-white border border-teal-200 text-slate-700 hover:border-teal-400'
-                    }`}
-                  >
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-
-              {/* 3 Specific Qualities Grid: Texture & Freshness, Flavor Profile, Cooking Behavior */}
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div className="rounded-xl border border-emerald-200 bg-white p-3">
-                  <span className="text-[11px] font-extrabold text-emerald-800 uppercase">
-                    1. Texture & Freshness
-                  </span>
-                  <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-                    {currentHoldItem.qualities?.texture_and_freshness ||
-                      'Firm, fresh culinary structure with optimal natural moisture and vibrant surface quality.'}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-amber-200 bg-white p-3">
-                  <span className="text-[11px] font-extrabold text-amber-800 uppercase">
-                    2. Flavor & Aroma Profile
-                  </span>
-                  <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-                    {currentHoldItem.qualities?.flavor_profile ||
-                      'Rich, balanced flavor notes that pair cleanly with toasted spices and aromatics.'}
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-rose-200 bg-white p-3">
-                  <span className="text-[11px] font-extrabold text-rose-800 uppercase">
-                    3. Cooking Behavior
-                  </span>
-                  <p className="text-xs text-slate-700 mt-1 leading-relaxed">
-                    {currentHoldItem.qualities?.cooking_behavior ||
-                      'Responds evenly to pan-roasting, simmering, or tempering with butter and spices.'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick 100g Macro & Benefit Footer */}
-              <div className="mt-2.5 pt-2.5 border-t border-teal-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-                <span className="font-mono font-bold text-slate-800">
-                  Per 100g: {currentHoldItem.calories_per_100g} kcal · Protein{' '}
-                  {currentHoldItem.macros.protein_g}g · Carbs{' '}
-                  {currentHoldItem.macros.carbs_g}g · Fat{' '}
-                  {currentHoldItem.macros.fat_g}g
-                </span>
-                <span className="text-emerald-800 font-semibold truncate">
-                  Key Benefit: {currentHoldItem.health_benefits[0]}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right 5 Columns: Quick Multi-Ingredient Camera Focus Combos & Custom Input */}
-        <div className="lg:col-span-5 flex flex-col justify-between gap-4">
-          <div className="rounded-2xl border-2 border-orange-200/90 bg-gradient-to-br from-orange-50/80 via-amber-50/50 to-rose-50/50 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-extrabold text-slate-900">
-                1-Tap Multi-Ingredient Camera Scans
-              </h3>
-              <span className="text-xs font-bold text-[#FF5A1F]">
-                Instant Scan & Recipes
-              </span>
-            </div>
-            <p className="text-xs text-slate-600 mt-1">
-              Click any ingredient combination below (or press Capture & Scan) to immediately see what you can cook for Breakfast, Lunch & Dinner:
-            </p>
-
-            <div className="mt-3 space-y-2">
-              {SCAN_PRESET_SCENES.map((scene) => {
-                const isSelected = selectedPresetId === scene.id;
-                return (
-                  <button
-                    key={scene.id}
-                    type="button"
-                    onClick={() => handlePresetLoad(scene.id)}
-                    className={`w-full min-h-[54px] text-left rounded-xl p-3 border transition-all flex items-center justify-between gap-3 cursor-pointer ${
-                      isSelected
-                        ? 'border-[#FF5A1F] bg-white shadow-md shadow-orange-500/10'
-                        : 'border-orange-200/70 bg-white/85 hover:bg-white hover:border-orange-300'
-                    }`}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-extrabold text-slate-900 truncate">
-                          {scene.label}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 truncate mt-0.5">
-                        {scene.subtitle}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[11px] font-mono font-bold text-emerald-700">
-                        {scene.badge}
-                      </span>
-                      <CheckCircle2
-                        className={`w-4 h-4 ${
-                          isSelected ? 'text-[#FF5A1F]' : 'text-slate-300'
-                        }`}
-                      />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Custom Camera Focus / Multi-Ingredient Scanner Input */}
+          {/* Simple Type-to-Add or 1-Tap Sample Basket */}
           <form
-            onSubmit={handleQuickAddIngredient}
-            className="rounded-2xl border-2 border-teal-200/80 bg-gradient-to-br from-teal-50/70 via-emerald-50/40 to-cyan-50/50 p-4"
+            onSubmit={handleAddTypedIngredient}
+            className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
           >
             <label
-              htmlFor="quick-add-ingredient-input"
-              className="block text-sm font-extrabold text-slate-900"
+              htmlFor="simple-ingredient-input"
+              className="block text-xs font-extrabold text-slate-800"
             >
-              Tell the Lens What You Have (or Add Any Ingredient)
+              Or Type an Ingredient to Add to Your Tray:
             </label>
-            <p className="text-xs text-slate-600 mt-0.5">
-              Type items you are holding (e.g., &ldquo;Potatoes, Spices and Butter&rdquo; or &ldquo;Eggs, Spinach, Cheese&rdquo;) to scan their qualities & Breakfast/Lunch/Dinner recipes:
-            </p>
-
-            <div className="mt-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            <div className="mt-2 flex items-center gap-2">
               <input
-                id="quick-add-ingredient-input"
+                id="simple-ingredient-input"
                 type="text"
                 value={manualName}
                 onChange={(e) => {
                   setManualName(e.target.value);
                   if (scanError) setScanError(null);
                 }}
-                placeholder="e.g., Potatoes, Spices, and Butter..."
-                className="flex-1 min-h-[44px] rounded-xl border border-teal-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-teal-600"
+                placeholder="e.g., Tomatoes, Paneer, Spinach, Garlic..."
+                className="flex-1 min-h-[42px] rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#FF5A1F]"
               />
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={25}
-                  max={5000}
-                  step={25}
-                  value={manualGrams}
-                  onChange={(e) => setManualGrams(e.target.value)}
-                  aria-label="Ingredient weight in grams"
-                  className="w-20 min-h-[44px] rounded-xl border border-teal-300 bg-white px-2.5 py-2 text-sm font-mono tabular-nums text-slate-900 focus:outline-none focus:border-teal-600"
-                />
-                <button
-                  type="submit"
-                  disabled={isAddingManual}
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs hover:opacity-95 disabled:opacity-50 transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
-                >
-                  {isAddingManual ? (
-                    <Sparkles className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Plus className="w-4 h-4" />
-                  )}
-                  <span>{isAddingManual ? 'Scanning...' : 'Scan & Add'}</span>
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="min-h-[42px] px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Item</span>
+              </button>
             </div>
-
             {scanError && (
               <div
                 role="alert"
-                className="mt-2.5 flex items-center gap-1.5 text-xs font-medium text-rose-600"
+                className="mt-2 flex items-center gap-1.5 text-xs font-medium text-rose-600"
               >
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{scanError}</span>
               </div>
             )}
+
+            <div className="mt-3 pt-3 border-t border-slate-200/80 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-500 mr-1">
+                Quick Test Sets:
+              </span>
+              {SCAN_PRESET_SCENES.map((scene) => (
+                <button
+                  key={scene.id}
+                  type="button"
+                  onClick={() => onLoadPresetPhotos(scene.id)}
+                  className="min-h-[32px] px-2.5 py-1 rounded-lg border border-orange-200 bg-white hover:border-[#FF5A1F] text-[11px] font-bold text-slate-700 cursor-pointer"
+                >
+                  {scene.label}
+                </button>
+              ))}
+            </div>
           </form>
         </div>
-      </div>
 
-      {/* Requirement #1 & #3: Immediate Scan & Uploaded Photo Recipe Options for Breakfast, Lunch & Dinner */}
-      <div
-        ref={immediateResultsRef}
-        aria-label="Immediate Scan Results for Breakfast, Lunch, and Dinner"
-        className="mt-6 rounded-2xl border-2 border-amber-300/90 bg-gradient-to-br from-amber-50/70 via-white to-orange-50/60 p-4 sm:p-5 shadow-md"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-amber-200/80">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-[#FF5A1F]">
-              <Sparkles className="w-4 h-4" />
-              <span>INSTANT SCAN & PHOTO RECIPE RESULTS</span>
-              <span aria-hidden="true">·</span>
-              <span className="text-emerald-700 font-mono">
-                {latestScanResult.sourceTitle}
+        {/* Right 6 Columns: Multi-Photo Ingredient Tray + Focused Ingredient Qualities */}
+        <div className="lg:col-span-6 flex flex-col gap-4">
+          <div className="rounded-2xl border-2 border-orange-200/80 bg-orange-50/40 p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Images className="w-5 h-5 text-[#FF5A1F]" />
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Your Ingredient Photo Tray ({photos.length}{' '}
+                  {photos.length === 1 ? 'Photo' : 'Photos'})
+                </h3>
+              </div>
+              <span className="text-xs font-semibold text-emerald-700">
+                Add as many photos as you need
               </span>
             </div>
-            <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mt-1">
-              What You Can Cook With{' '}
-              <span className="text-[#FF5A1F]">
-                {latestScanResult.inventory
-                  .slice(0, 3)
-                  .map((i) => i.name)
-                  .join(', ')}
-              </span>{' '}
-              for Breakfast, Lunch & Dinner
-            </h3>
-            <p className="text-xs text-slate-600 mt-0.5">
-              {latestScanResult.summary}
-            </p>
-          </div>
 
-          {/* Meal Time Filter Tabs (All / Breakfast / Lunch / Dinner) */}
-          <div
-            role="group"
-            aria-label="Filter scanned recipes by Breakfast, Lunch, or Dinner"
-            className="flex flex-wrap items-center gap-1.5 shrink-0"
-          >
-            <button
-              type="button"
-              onClick={() => setSelectedMealTab('All')}
-              className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedMealTab === 'All'
-                  ? 'bg-slate-900 text-white shadow-xs'
-                  : 'bg-white border border-amber-200 text-slate-700 hover:border-amber-400'
-              }`}
-            >
-              All Meals ({latestScanResult.recipes.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedMealTab('Breakfast')}
-              className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                selectedMealTab === 'Breakfast'
-                  ? 'bg-amber-500 text-white shadow-xs'
-                  : 'bg-white border border-amber-200 text-amber-800 hover:border-amber-400'
-              }`}
-            >
-              <Sun className="w-3.5 h-3.5" />
-              <span>Breakfast ({breakfastCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedMealTab('Lunch')}
-              className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                selectedMealTab === 'Lunch'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'bg-white border border-emerald-200 text-emerald-800 hover:border-emerald-400'
-              }`}
-            >
-              <Utensils className="w-3.5 h-3.5" />
-              <span>Lunch ({lunchCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedMealTab('Dinner')}
-              className={`min-h-[38px] px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                selectedMealTab === 'Dinner'
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-white border border-rose-200 text-rose-800 hover:border-rose-400'
-              }`}
-            >
-              <Moon className="w-3.5 h-3.5" />
-              <span>Dinner ({dinnerCount})</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Recipe Options Grid directly inside the Scanner */}
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-          {filteredImmediateRecipes.map((recipe) => {
-            const mealBadgeColor =
-              recipe.meal_type === 'Breakfast'
-                ? 'text-amber-700 border-amber-200 bg-amber-50'
-                : recipe.meal_type === 'Lunch'
-                ? 'text-emerald-700 border-emerald-200 bg-emerald-50'
-                : 'text-rose-700 border-rose-200 bg-rose-50';
-
-            return (
-              <div
-                key={recipe.id}
-                className="rounded-2xl border border-orange-200/90 bg-white p-4 flex flex-col justify-between shadow-xs hover:shadow-md hover:border-[#FF5A1F] transition-all"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <span
-                      className={`font-extrabold px-2.5 py-0.5 rounded-md border ${mealBadgeColor}`}
-                    >
-                      {recipe.meal_type}
-                    </span>
-                    <span className="font-mono font-semibold text-slate-600">
-                      {recipe.cuisine} · {recipe.crafting_difficulty}
-                    </span>
-                  </div>
-
-                  <h4 className="text-sm sm:text-base font-extrabold text-slate-900 mt-2">
-                    {recipe.title}
-                  </h4>
-
-                  <p className="text-xs text-slate-600 mt-1 line-clamp-2">
-                    {recipe.chef_note ||
-                      `Crafted with ${recipe.used_ingredients.join(', ')}.`}
-                  </p>
-
-                  <p className="text-[11px] font-semibold text-emerald-800 mt-2 truncate">
-                    Uses: {recipe.used_ingredients.join(' + ')}
-                  </p>
-                </div>
-
-                <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5 text-xs font-mono font-bold tabular-nums text-slate-700">
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-[#FF5A1F]" />
-                      {recipe.prep_cook_minutes}m
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 text-amber-500" />
-                      {recipe.total_calories} kcal
-                    </span>
-                    <span className="text-emerald-700">
-                      {recipe.protein_g}g P
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => onSelectRecipeForCrafting(recipe)}
-                    className="min-h-[38px] px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-bold text-xs hover:opacity-95 transition-all flex items-center gap-1.5 shrink-0 cursor-pointer"
+            {/* Grid of Captured/Uploaded Ingredient Photos */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[310px] overflow-y-auto pr-1">
+              {photos.map((photo) => {
+                const isSelected = inspectedPhoto?.id === photo.id;
+                const mainItem = photo.detectedItems[0];
+                return (
+                  <div
+                    key={photo.id}
+                    className={`rounded-2xl border-2 bg-white p-3 flex items-center justify-between gap-3 transition-all ${
+                      isSelected
+                        ? 'border-[#FF5A1F] shadow-md shadow-orange-500/10'
+                        : 'border-slate-200 hover:border-orange-300'
+                    }`}
                   >
-                    <ChefHat className="w-3.5 h-3.5" />
-                    <span>Cook Now →</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveInspectPhotoId(photo.id)}
+                      className="flex items-center gap-3 text-left min-w-0 flex-1 cursor-pointer"
+                    >
+                      <img
+                        src={photo.previewUrl}
+                        alt={photo.label}
+                        referrerPolicy="no-referrer"
+                        className="w-14 h-14 rounded-xl object-cover border border-slate-200 shrink-0"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold text-slate-900 truncate">
+                          {mainItem ? mainItem.name : photo.label}
+                        </p>
+                        <p className="text-[11px] text-slate-600 truncate mt-0.5">
+                          {mainItem
+                            ? `${mainItem.category} · ${mainItem.calories_per_100g} kcal/100g`
+                            : photo.capturedAt}
+                        </p>
+                        <p className="text-[10px] font-bold text-[#FF5A1F] mt-0.5">
+                          Click to view qualities
+                        </p>
+                      </div>
+                    </button>
+
+                    {photos.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => onRemovePhotoFromTray(photo.id)}
+                        className="min-h-[36px] min-w-[36px] rounded-lg border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 flex items-center justify-center shrink-0 cursor-pointer"
+                        aria-label={`Remove ${photo.label}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Hold-Still / Selected Ingredient Specific Qualities Box */}
+            {inspectedItem && (
+              <div className="mt-4 rounded-2xl border border-teal-200 bg-white p-4">
+                <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                  <span className="text-xs font-extrabold text-teal-800">
+                    Ingredient Qualities: {inspectedItem.name}
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-slate-600">
+                    P {inspectedItem.macros.protein_g}g · C{' '}
+                    {inspectedItem.macros.carbs_g}g · F{' '}
+                    {inspectedItem.macros.fat_g}g
+                  </span>
+                </div>
+                <div className="mt-2.5 space-y-1.5 text-xs text-slate-700">
+                  <p>
+                    <strong className="text-emerald-800">
+                      Texture & Freshness:
+                    </strong>{' '}
+                    {inspectedItem.qualities?.texture_and_freshness}
+                  </p>
+                  <p>
+                    <strong className="text-amber-800">Flavor Profile:</strong>{' '}
+                    {inspectedItem.qualities?.flavor_profile}
+                  </p>
+                  <p>
+                    <strong className="text-rose-800">Cooking Behavior:</strong>{' '}
+                    {inspectedItem.qualities?.cooking_behavior}
+                  </p>
                 </div>
               </div>
-            );
-          })}
+            )}
+
+            {/* Big Unmistakable Next Button */}
+            <div className="mt-5 pt-4 border-t border-orange-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-800">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>
+                  {photos.length}{' '}
+                  {photos.length === 1
+                    ? 'ingredient photo'
+                    : 'ingredient photos'}{' '}
+                  ready for recipe matching
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={onProceedToServings}
+                className="min-h-[50px] px-6 py-3 rounded-2xl bg-gradient-to-r from-[#FF5A1F] via-[#FF2E63] to-[#F59E0B] text-white font-extrabold text-sm hover:opacity-95 active:scale-[0.99] transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Next: Choose How Many People & Diet</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>

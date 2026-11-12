@@ -37,7 +37,9 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
 
       const health_benefits = Array.isArray(it.health_benefits)
         ? it.health_benefits
-            .filter((b): b is string => typeof b === 'string' && b.trim().length > 0)
+            .filter(
+              (b): b is string => typeof b === 'string' && b.trim().length > 0
+            )
             .map((b) => b.trim())
         : ['Rich in essential culinary micronutrients'];
 
@@ -79,7 +81,10 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
           typeof it.unit_label === 'string' ? it.unit_label : undefined,
         freshness_days:
           typeof it.freshness_days === 'number' ? it.freshness_days : 5,
-        calories_per_100g: Math.max(0, Math.round(Number(it.calories_per_100g) || 0)),
+        calories_per_100g: Math.max(
+          0,
+          Math.round(Number(it.calories_per_100g) || 0)
+        ),
         macros,
         health_benefits:
           health_benefits.length > 0
@@ -115,7 +120,10 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
           if (!instruction) return null;
           return {
             instruction,
-            timer_seconds: Math.max(0, Math.round(Number(st.timer_seconds) || 0)),
+            timer_seconds: Math.max(
+              0,
+              Math.round(Number(st.timer_seconds) || 0)
+            ),
             tip: typeof st.tip === 'string' ? st.tip.trim() : undefined,
           };
         })
@@ -123,7 +131,32 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
 
       const used_ingredients = Array.isArray(r.used_ingredients)
         ? r.used_ingredients.filter((u): u is string => typeof u === 'string')
-        : inferUsedIngredients(title, steps.map((s) => s.instruction), inventory);
+        : inferUsedIngredients(
+            title,
+            steps.map((s) => s.instruction),
+            inventory
+          );
+
+      const missing_vegetables = Array.isArray(r.missing_vegetables)
+        ? r.missing_vegetables
+            .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+            .map((v) => v.trim())
+        : undefined;
+
+      const missing_spices = Array.isArray(r.missing_spices)
+        ? r.missing_spices
+            .filter((sp): sp is string => typeof sp === 'string' && sp.trim().length > 0)
+            .map((sp) => sp.trim())
+        : undefined;
+
+      const servings =
+        typeof r.servings === 'number' && r.servings > 0
+          ? Math.round(r.servings)
+          : undefined;
+
+      const dietary_tags = Array.isArray(r.dietary_tags)
+        ? r.dietary_tags.filter((d): d is string => typeof d === 'string')
+        : undefined;
 
       return {
         id:
@@ -136,13 +169,23 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
             ? r.cuisine.trim()
             : 'Global',
         meal_type: normalizeMealType(r.meal_type),
-        prep_cook_minutes: Math.max(5, Math.round(Number(r.prep_cook_minutes) || 15)),
-        total_calories: Math.max(50, Math.round(Number(r.total_calories) || 250)),
+        prep_cook_minutes: Math.max(
+          5,
+          Math.round(Number(r.prep_cook_minutes) || 15)
+        ),
+        total_calories: Math.max(
+          50,
+          Math.round(Number(r.total_calories) || 250)
+        ),
         protein_g: roundOneDecimal(Number(r.protein_g) || 8),
         carbs_g: roundOneDecimal(Number(r.carbs_g) || 28),
         fat_g: roundOneDecimal(Number(r.fat_g) || 9),
         crafting_difficulty: normalizeDifficulty(r.crafting_difficulty),
         used_ingredients,
+        missing_vegetables,
+        missing_spices,
+        servings,
+        dietary_tags,
         steps:
           steps.length > 0
             ? steps
@@ -168,11 +211,151 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
   };
 }
 
-export function normalizeMealType(val: unknown): 'Breakfast' | 'Lunch' | 'Dinner' {
+/**
+ * Determines which ingredients the user ALREADY has from their photos and which
+ * additional vegetables or spices are lacking to complete or elevate the recipe.
+ */
+export function computeMissingIngredientsForRecipe(
+  recipe: RecipeItem,
+  availableInventory: InventoryItem[]
+): {
+  haveIngredients: string[];
+  missingVegetables: string[];
+  missingSpices: string[];
+} {
+  const lowerAvail = availableInventory.map((i) => i.name.toLowerCase());
+
+  const hasMatch = (candidate: string): boolean => {
+    const low = candidate.toLowerCase();
+    return lowerAvail.some(
+      (avail) =>
+        avail.includes(low) ||
+        low.includes(avail) ||
+        low
+          .split(/[\s,()]+/)
+          .some((word) => word.length >= 4 && avail.includes(word))
+    );
+  };
+
+  const haveIngredients: string[] = [];
+  const lackingFromUsedVeg: string[] = [];
+  const lackingFromUsedSpice: string[] = [];
+
+  for (const used of recipe.used_ingredients) {
+    if (hasMatch(used)) {
+      haveIngredients.push(used);
+    } else {
+      const low = used.toLowerCase();
+      if (
+        low.includes('spice') ||
+        low.includes('cumin') ||
+        low.includes('turmeric') ||
+        low.includes('masala') ||
+        low.includes('pepper') ||
+        low.includes('paprika') ||
+        low.includes('salt')
+      ) {
+        lackingFromUsedSpice.push(used);
+      } else {
+        lackingFromUsedVeg.push(used);
+      }
+    }
+  }
+
+  // Merge explicit recipe missing_vegetables with any lacking used vegetables
+  const explicitVeg = (recipe.missing_vegetables || []).filter(
+    (v) => !hasMatch(v)
+  );
+  const explicitSpices = (recipe.missing_spices || []).filter(
+    (s) => !hasMatch(s)
+  );
+
+  let missingVegetables = Array.from(
+    new Set([...lackingFromUsedVeg, ...explicitVeg])
+  );
+  let missingSpices = Array.from(
+    new Set([...lackingFromUsedSpice, ...explicitSpices])
+  );
+
+  // Provide helpful culinary suggestions if both arrays are empty so the user always knows
+  // what extra vegetable or spice is lacking to finish the dish
+  if (missingVegetables.length === 0) {
+    const defaultVegCandidates = [
+      'Fresh Coriander Leaves (Cilantro)',
+      '1 Green Chili or Bell Pepper',
+      'Fresh Ginger or Garlic Clove',
+      'Ripe Vine Tomato',
+    ];
+    missingVegetables = defaultVegCandidates
+      .filter((c) => !hasMatch(c))
+      .slice(0, 2);
+  }
+
+  if (missingSpices.length === 0) {
+    const defaultSpiceCandidates = [
+      'Garam Masala or Toasted Coriander Powder (1/2 tsp)',
+      'Crushed Black Pepper & Sea Salt',
+      'Smoked Paprika or Red Chili Flakes',
+      'Dry Mango Powder (Amchur) or Lemon Juice',
+    ];
+    missingSpices = defaultSpiceCandidates
+      .filter((c) => !hasMatch(c))
+      .slice(0, 2);
+  }
+
+  if (haveIngredients.length === 0 && availableInventory.length > 0) {
+    haveIngredients.push(
+      ...availableInventory.slice(0, 3).map((i) => i.name)
+    );
+  }
+
+  return {
+    haveIngredients,
+    missingVegetables,
+    missingSpices,
+  };
+}
+
+/**
+ * Scales a recipe's nutritional profile and step instructions to the target
+ * number of people (e.g. 2, 3, 4 people) and adapts for dietary restrictions.
+ */
+export function scaleRecipeForPeopleAndDiet(
+  recipe: RecipeItem,
+  peopleCount: number,
+  dietaryRestriction: string
+): RecipeItem {
+  const safePeople = Math.max(1, Math.min(12, Math.round(peopleCount) || 2));
+  const dietNote =
+    dietaryRestriction && dietaryRestriction !== 'No Restrictions'
+      ? ` (${dietaryRestriction})`
+      : '';
+
+  return {
+    ...recipe,
+    servings: safePeople,
+    dietary_tags:
+      dietaryRestriction && dietaryRestriction !== 'No Restrictions'
+        ? [dietaryRestriction]
+        : ['All Diets'],
+    chef_note: `Scaled for ${safePeople} ${
+      safePeople === 1 ? 'Person' : 'People'
+    }${dietNote}. ${recipe.chef_note || ''}`.trim(),
+  };
+}
+
+export function normalizeMealType(
+  val: unknown
+): 'Breakfast' | 'Lunch' | 'Dinner' {
   if (typeof val !== 'string') return 'Lunch';
   const lower = val.trim().toLowerCase();
-  if (lower.includes('breakfast') || lower.includes('morning')) return 'Breakfast';
-  if (lower.includes('dinner') || lower.includes('supper') || lower.includes('evening'))
+  if (lower.includes('breakfast') || lower.includes('morning'))
+    return 'Breakfast';
+  if (
+    lower.includes('dinner') ||
+    lower.includes('supper') ||
+    lower.includes('evening')
+  )
     return 'Dinner';
   return 'Lunch';
 }
@@ -242,15 +425,25 @@ export function filterRecipes(
   const invNames = new Set(inventory.map((i) => i.name.toLowerCase()));
 
   return recipes.filter((recipe) => {
-    if (mealType !== 'All' && recipe.meal_type.toLowerCase() !== mealType.toLowerCase()) {
+    if (
+      mealType !== 'All' &&
+      recipe.meal_type.toLowerCase() !== mealType.toLowerCase()
+    ) {
       return false;
     }
 
-    if (cuisine !== 'All' && recipe.cuisine.toLowerCase() !== cuisine.toLowerCase()) {
+    if (
+      cuisine !== 'All' &&
+      recipe.cuisine.toLowerCase() !== cuisine.toLowerCase()
+    ) {
       return false;
     }
 
-    if (onlyAvailableInventory && invNames.size > 0 && recipe.used_ingredients.length > 0) {
+    if (
+      onlyAvailableInventory &&
+      invNames.size > 0 &&
+      recipe.used_ingredients.length > 0
+    ) {
       const hasAtLeastOneCore = recipe.used_ingredients.some((reqName) => {
         const lowerReq = reqName.toLowerCase();
         for (const inv of invNames) {
@@ -281,8 +474,6 @@ export function filterRecipes(
 /**
  * Deducts consumed ingredients from the user's virtual pantry after completing a dish
  * in RPG-Style "Crafting" Mode.
- * Each used ingredient has its quantity reduced by `gramsPerIngredient` (default 100g).
- * Items that drop to 0g are removed from the active inventory.
  */
 export function deductInventoryAfterCrafting(
   inventory: InventoryItem[],

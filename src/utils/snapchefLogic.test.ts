@@ -7,6 +7,8 @@ import {
   mergeScannedInventory,
   formatTimerMMSS,
   calculatePantryTotals,
+  computeMissingIngredientsForRecipe,
+  scaleRecipeForPeopleAndDiet,
 } from './snapchefLogic';
 
 test('normalizeSnapChefPayload parses the exact PRD schema accurately', () => {
@@ -35,6 +37,8 @@ test('normalizeSnapChefPayload parses the exact PRD schema accurately', () => {
         total_calories: 250,
         protein_g: 4.5,
         crafting_difficulty: 'Level 1',
+        missing_vegetables: ['Fresh Coriander Leaves', 'Green Chili'],
+        missing_spices: ['Garam Masala', 'Dry Mango Powder (Amchur)'],
         steps: [
           {
             instruction: 'Boil diced potatoes until tender.',
@@ -59,6 +63,84 @@ test('normalizeSnapChefPayload parses the exact PRD schema accurately', () => {
   assert.equal(normalized.recipes[0].title, 'Aloo Jeera (Cumin Spiced Potatoes)');
   assert.equal(normalized.recipes[0].steps[0].timer_seconds, 720);
   assert.deepEqual(normalized.recipes[0].used_ingredients, ['Potato']);
+  assert.deepEqual(normalized.recipes[0].missing_vegetables, [
+    'Fresh Coriander Leaves',
+    'Green Chili',
+  ]);
+  assert.deepEqual(normalized.recipes[0].missing_spices, [
+    'Garam Masala',
+    'Dry Mango Powder (Amchur)',
+  ]);
+});
+
+test('computeMissingIngredientsForRecipe identifies haveIngredients, missingVegetables, and missingSpices', () => {
+  const payload = normalizeSnapChefPayload({
+    inventory: [
+      { name: 'Potato', category: 'Vegetable', calories_per_100g: 77 },
+      { name: 'Cultured Creamery Butter', category: 'Dairy', calories_per_100g: 717 },
+    ],
+    recipes: [
+      {
+        title: 'Punjabi Jeera Butter Aloo',
+        cuisine: 'Indian',
+        meal_type: 'Lunch',
+        prep_cook_minutes: 20,
+        total_calories: 295,
+        protein_g: 4.5,
+        crafting_difficulty: 'Level 1',
+        used_ingredients: ['Potato', 'Cultured Creamery Butter', 'Fresh Tomatoes'],
+        missing_vegetables: ['Fresh Coriander Leaves (Cilantro)'],
+        missing_spices: ['Whole Cumin Seeds (Jeera)', 'Garam Masala'],
+        steps: [{ instruction: 'Sear potatoes in butter', timer_seconds: 180 }],
+      },
+    ],
+  });
+
+  const breakdown = computeMissingIngredientsForRecipe(
+    payload.recipes[0],
+    payload.inventory
+  );
+
+  assert.deepEqual(breakdown.haveIngredients, [
+    'Potato',
+    'Cultured Creamery Butter',
+  ]);
+  assert.equal(breakdown.missingVegetables.includes('Fresh Tomatoes'), true);
+  assert.equal(
+    breakdown.missingVegetables.includes('Fresh Coriander Leaves (Cilantro)'),
+    true
+  );
+  assert.equal(
+    breakdown.missingSpices.includes('Whole Cumin Seeds (Jeera)'),
+    true
+  );
+});
+
+test('scaleRecipeForPeopleAndDiet attaches servings and dietary tags', () => {
+  const payload = normalizeSnapChefPayload({
+    inventory: [{ name: 'Potato', category: 'Vegetable', calories_per_100g: 77 }],
+    recipes: [
+      {
+        title: 'Masala Potato Skillet',
+        cuisine: 'Indian',
+        meal_type: 'Breakfast',
+        prep_cook_minutes: 15,
+        total_calories: 300,
+        protein_g: 5,
+        crafting_difficulty: 'Level 1',
+        steps: [{ instruction: 'Cook potatoes', timer_seconds: 120 }],
+      },
+    ],
+  });
+
+  const scaled = scaleRecipeForPeopleAndDiet(
+    payload.recipes[0],
+    4,
+    'Vegetarian'
+  );
+  assert.equal(scaled.servings, 4);
+  assert.deepEqual(scaled.dietary_tags, ['Vegetarian']);
+  assert.equal(scaled.chef_note?.includes('Scaled for 4 People (Vegetarian)'), true);
 });
 
 test('filterRecipes filters by meal_type, cuisine, and search query', () => {
@@ -117,7 +199,6 @@ test('deductInventoryAfterCrafting updates virtual pantry quantities and removes
   );
 
   assert.deepEqual(consumedNames, ['Potato', 'Cumin Seeds']);
-  // Cumin Seeds (80g - 100g <= 0) should be removed, Potato reduced to 200g, Spinach untouched
   assert.equal(updatedInventory.length, 2);
   const potato = updatedInventory.find((i) => i.name === 'Potato');
   assert.equal(potato?.quantity_g, 200);

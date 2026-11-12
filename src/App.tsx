@@ -1,46 +1,61 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Camera,
-  BookOpen,
   ChefHat,
+  Users,
   Flame,
-  Activity,
+  Volume2,
+  VolumeX,
+  CheckCircle2,
+  HelpCircle,
 } from 'lucide-react';
 import type {
+  CapturedIngredientPhoto,
   CraftedMealLog,
+  DietaryRestriction,
   InventoryItem,
   MealType,
   RecipeItem,
   SnapChefPayload,
 } from './types/snapchef';
-import { INITIAL_INVENTORY, INITIAL_RECIPES } from './data/seedData';
 import {
-  calculatePantryTotals,
+  INITIAL_INVENTORY,
+  INITIAL_PHOTO_TRAY,
+  INITIAL_RECIPES,
+  POTATO_SPICES_BUTTER_RECIPES,
+  SCAN_PRESET_SCENES,
+  makeIngredientThumbSvg,
+} from './data/seedData';
+import {
   deductInventoryAfterCrafting,
   mergeScannedInventory,
+  normalizeSnapChefPayload,
+  scaleRecipeForPeopleAndDiet,
 } from './utils/snapchefLogic';
+import { playRelaxingClickSound } from './utils/soundEffects';
 import { CameraScannerEye } from './components/CameraScannerEye';
-import { InventoryLootGrid } from './components/InventoryLootGrid';
+import { ServingsAndDietStep } from './components/ServingsAndDietStep';
 import { RecipeSynthesizer } from './components/RecipeSynthesizer';
 import { CraftingModeHUD } from './components/CraftingModeHUD';
-import { NutritionLogSection } from './components/NutritionLogSection';
 import {
   OfflineIndicator,
   PWAInstallModalTrigger,
 } from './components/PWAInstallButton';
 
 const STORAGE_KEYS = {
-  INVENTORY: 'snapchef_pantry_inventory_v1',
-  RECIPES: 'snapchef_synthesized_recipes_v1',
-  HISTORY: 'snapchef_crafted_history_v1',
+  PHOTOS: 'snapchef_photo_tray_v2',
+  RECIPES: 'snapchef_synthesized_recipes_v2',
+  SERVINGS: 'snapchef_servings_v2',
+  DIET: 'snapchef_diet_v2',
+  SOUND: 'snapchef_relaxing_sound_v2',
 };
 
-type ActiveSection = 'scanner' | 'codex' | 'recipes' | 'crafting' | 'macros';
+type WizardStep = 'photos' | 'preferences' | 'recipes' | 'cooking';
 
 export default function App() {
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => {
+  const [photos, setPhotos] = useState<CapturedIngredientPhoto[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.INVENTORY);
+      const saved = localStorage.getItem(STORAGE_KEYS.PHOTOS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
@@ -48,8 +63,31 @@ export default function App() {
     } catch {
       // Ignore storage error
     }
-    return INITIAL_INVENTORY;
+    return INITIAL_PHOTO_TRAY;
   });
+
+  const [servings, setServings] = useState<number>(() => {
+    try {
+      const saved = Number(localStorage.getItem(STORAGE_KEYS.SERVINGS));
+      if (saved >= 1 && saved <= 12) return saved;
+    } catch {
+      // Ignore
+    }
+    return 3;
+  });
+
+  const [dietaryRestriction, setDietaryRestriction] =
+    useState<DietaryRestriction>(() => {
+      try {
+        const saved = localStorage.getItem(
+          STORAGE_KEYS.DIET
+        ) as DietaryRestriction | null;
+        if (saved) return saved;
+      } catch {
+        // Ignore
+      }
+      return 'No Restrictions';
+    });
 
   const [recipes, setRecipes] = useState<RecipeItem[]>(() => {
     try {
@@ -59,173 +97,198 @@ export default function App() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {
-      // Ignore storage error
+      // Ignore
     }
-    return INITIAL_RECIPES;
+    return POTATO_SPICES_BUTTER_RECIPES;
   });
 
-  const [craftedHistory, setCraftedHistory] = useState<CraftedMealLog[]>(() => {
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.HISTORY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
+      const saved = localStorage.getItem(STORAGE_KEYS.SOUND);
+      if (saved !== null) return saved === 'true';
     } catch {
-      // Ignore storage error
+      // Ignore
     }
-    return [];
+    return true;
   });
 
-  const [selectedCodexItem, setSelectedCodexItem] =
-    useState<InventoryItem | null>(() => INITIAL_INVENTORY[0] || null);
+  const [activeStep, setActiveStep] = useState<WizardStep>('photos');
   const [activeMealFilter, setActiveMealFilter] = useState<'All' | MealType>(
     'All'
   );
-  const [activeCraftingRecipe, setActiveCraftingRecipe] =
-    useState<RecipeItem>(INITIAL_RECIPES[0]);
-  const [activeNav, setActiveNav] = useState<ActiveSection>('scanner');
+  const [activeCraftingRecipe, setActiveCraftingRecipe] = useState<RecipeItem>(
+    () => POTATO_SPICES_BUTTER_RECIPES[0] || INITIAL_RECIPES[0]
+  );
+  const [isSynthesizingStep2, setIsSynthesizingStep2] =
+    useState<boolean>(false);
   const [statusToast, setStatusToast] = useState<string | null>(null);
 
-  const scannerRef = useRef<HTMLDivElement | null>(null);
-  const codexRef = useRef<HTMLDivElement | null>(null);
-  const recipesRef = useRef<HTMLDivElement | null>(null);
-  const craftingRef = useRef<HTMLDivElement | null>(null);
-  const macrosRef = useRef<HTMLDivElement | null>(null);
+  // Derive combined inventory from all uploaded/captured photos in the tray
+  const inventory: InventoryItem[] = React.useMemo(() => {
+    let acc: InventoryItem[] = [];
+    for (const p of photos) {
+      acc = mergeScannedInventory(acc, p.detectedItems);
+    }
+    return acc.length > 0 ? acc : INITIAL_INVENTORY.slice(0, 3);
+  }, [photos]);
 
-  // Sync state to LocalStorage
+  // Global relaxing click sound listener for all buttons
+  useEffect(() => {
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const button = target.closest('button, a');
+      if (button) {
+        playRelaxingClickSound('soft', soundEnabled);
+      }
+    };
+    document.addEventListener('click', handleGlobalClick);
+    return () => document.removeEventListener('click', handleGlobalClick);
+  }, [soundEnabled]);
+
+  // Persist user state
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(inventory));
+      localStorage.setItem(STORAGE_KEYS.PHOTOS, JSON.stringify(photos));
     } catch {
       // Ignore quota errors
     }
-  }, [inventory]);
+  }, [photos]);
 
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.RECIPES, JSON.stringify(recipes));
     } catch {
-      // Ignore quota errors
+      // Ignore
     }
   }, [recipes]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        STORAGE_KEYS.HISTORY,
-        JSON.stringify(craftedHistory)
-      );
+      localStorage.setItem(STORAGE_KEYS.SERVINGS, String(servings));
+      localStorage.setItem(STORAGE_KEYS.DIET, dietaryRestriction);
+      localStorage.setItem(STORAGE_KEYS.SOUND, String(soundEnabled));
     } catch {
-      // Ignore quota errors
+      // Ignore
     }
-  }, [craftedHistory]);
+  }, [servings, dietaryRestriction, soundEnabled]);
 
   const showToast = (msg: string) => {
     setStatusToast(msg);
     window.setTimeout(() => {
       setStatusToast((prev) => (prev === msg ? null : prev));
-    }, 5000);
+    }, 4500);
   };
 
-  const scrollToSection = (section: ActiveSection) => {
-    setActiveNav(section);
-    const map: Record<ActiveSection, React.RefObject<HTMLDivElement | null>> = {
-      scanner: scannerRef,
-      codex: codexRef,
-      recipes: recipesRef,
-      crafting: craftingRef,
-      macros: macrosRef,
-    };
-    const target = map[section]?.current;
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+  const goToStep = (step: WizardStep) => {
+    playRelaxingClickSound('step', soundEnabled);
+    setActiveStep(step);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleScanComplete = (
-    payload: SnapChefPayload,
-    mode: 'replace' | 'merge',
-    sourceLabel: string
+  const handleAddPhotoToTray = (
+    newPhoto: CapturedIngredientPhoto,
+    recipesFromScan?: SnapChefPayload['recipes']
   ) => {
-    const nextInv =
-      mode === 'merge'
-        ? mergeScannedInventory(itemOrEmpty(payload.inventory), inventory)
-        : payload.inventory;
-
-    setInventory(nextInv);
-    if (payload.inventory.length > 0) {
-      setSelectedCodexItem(payload.inventory[0]);
-    } else if (nextInv.length > 0) {
-      setSelectedCodexItem(nextInv[0]);
+    setPhotos((prev) => [...prev, newPhoto]);
+    if (recipesFromScan && recipesFromScan.length > 0) {
+      setRecipes((prev) => [...recipesFromScan, ...prev]);
     }
-
-    if (payload.recipes.length > 0) {
-      setRecipes(payload.recipes);
-      setActiveCraftingRecipe(payload.recipes[0]);
-    }
-    showToast(
-      `${sourceLabel}: Cataloged ${nextInv.length} ingredients & ${
-        payload.recipes.length || recipes.length
-      } delicious global dishes!`
-    );
   };
 
-  function itemOrEmpty(items: InventoryItem[]): InventoryItem[] {
-    return Array.isArray(items) ? items : [];
-  }
-
-  const handleAddSingleIngredient = (
-    item: InventoryItem,
-    newRecipes?: RecipeItem[]
-  ) => {
-    const merged = mergeScannedInventory([item], inventory);
-    setInventory(merged);
-    setSelectedCodexItem(item);
-    if (newRecipes && newRecipes.length > 0) {
-      setRecipes((prev) => [...newRecipes, ...prev]);
-    }
-    showToast(
-      `Added "${item.name}" to your kitchen basket and opened its Nutritional Codex!`
-    );
-  };
-
-  const handleUpdateQuantity = (id: string, deltaGrams: number) => {
-    setInventory((prev) =>
-      prev
-        .map((item) => {
-          if (item.id !== id) return item;
-          const nextQ = item.quantity_g + deltaGrams;
-          return nextQ > 0 ? { ...item, quantity_g: nextQ } : null;
-        })
-        .filter((item): item is InventoryItem => item !== null)
-    );
-  };
-
-  const handleRemoveItem = (id: string) => {
-    setInventory((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      if (selectedCodexItem?.id === id) {
-        setSelectedCodexItem(next[0] || null);
-      }
-      return next;
+  const handleRemovePhotoFromTray = (photoId: string) => {
+    setPhotos((prev) => {
+      const filtered = prev.filter((p) => p.id !== photoId);
+      return filtered.length > 0 ? filtered : prev;
     });
+  };
+
+  const handleLoadPresetPhotos = (presetId: string) => {
+    const preset = SCAN_PRESET_SCENES.find((s) => s.id === presetId);
+    if (!preset) return;
+    const accentColors = ['#EA580C', '#D97706', '#059669', '#0284C7', '#E11D48'];
+    const bgColors = ['#FFF7ED', '#FEFCE8', '#ECFDF5', '#F0F9FF', '#FFF1F2'];
+
+    const newTray: CapturedIngredientPhoto[] = preset.payload.inventory.map(
+      (item, idx) => ({
+        id: `preset-${preset.id}-${idx}`,
+        label: `Photo #${idx + 1}: ${item.name}`,
+        previewUrl: makeIngredientThumbSvg(
+          item.name,
+          `${item.category} · ${item.quantity_g}g`,
+          accentColors[idx % accentColors.length],
+          bgColors[idx % bgColors.length]
+        ),
+        detectedItems: [item],
+        capturedAt: `Photo ${idx + 1}`,
+      })
+    );
+
+    setPhotos(newTray);
+    setRecipes(preset.payload.recipes);
+    showToast(
+      `Loaded ${newTray.length} ingredient photos (${preset.label})! Click "Next: Choose How Many People & Diet" to continue.`
+    );
+  };
+
+  const handleGenerateRecipesFromStep2 = async () => {
+    setIsSynthesizingStep2(true);
+
+    try {
+      const response = await fetch('/api/synthesize-recipes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inventory,
+          mealIntent: activeMealFilter,
+          servings,
+          dietaryRestriction,
+        }),
+      });
+
+      if (response.ok) {
+        const raw = await response.json();
+        const normalized = normalizeSnapChefPayload(raw);
+        if (normalized.recipes.length > 0) {
+          const scaled = normalized.recipes.map((r) =>
+            scaleRecipeForPeopleAndDiet(r, servings, dietaryRestriction)
+          );
+          setRecipes(scaled);
+          setActiveCraftingRecipe(scaled[0]);
+          setIsSynthesizingStep2(false);
+          playRelaxingClickSound('success', soundEnabled);
+          goToStep('recipes');
+          return;
+        }
+      }
+    } catch {
+      // Fallback to instant local scaling below
+    }
+
+    const scaledFallback = recipes.map((r) =>
+      scaleRecipeForPeopleAndDiet(r, servings, dietaryRestriction)
+    );
+    setRecipes(scaledFallback);
+    if (scaledFallback[0]) {
+      setActiveCraftingRecipe(scaledFallback[0]);
+    }
+    setIsSynthesizingStep2(false);
+    playRelaxingClickSound('success', soundEnabled);
+    goToStep('recipes');
   };
 
   const handleSelectRecipeForCrafting = (recipe: RecipeItem) => {
     setActiveCraftingRecipe(recipe);
-    scrollToSection('crafting');
+    goToStep('cooking');
   };
 
   const handleCompleteCrafting = (recipe: RecipeItem) => {
-    const { updatedInventory, consumedNames } = deductInventoryAfterCrafting(
+    const { consumedNames } = deductInventoryAfterCrafting(
       inventory,
       recipe.used_ingredients,
       100
     );
-    setInventory(updatedInventory);
-
-    const newLog: CraftedMealLog = {
+    const completedLog: CraftedMealLog = {
       id: `meal-${Date.now()}`,
       recipeId: recipe.id,
       title: recipe.title,
@@ -242,38 +305,26 @@ export default function App() {
       consumedIngredients:
         consumedNames.length > 0 ? consumedNames : recipe.used_ingredients,
     };
-
-    setCraftedHistory((prev) => [newLog, ...prev]);
+    playRelaxingClickSound('success', soundEnabled);
     showToast(
-      `Completed "${recipe.title}"! Deducted used ingredients from your kitchen basket.`
+      `Finished cooking "${completedLog.title}" for ${servings} ${
+        servings === 1 ? 'Person' : 'People'
+      }! Enjoy your meal!`
     );
   };
-
-  const handleResetDemoData = () => {
-    setInventory(INITIAL_INVENTORY);
-    setRecipes(INITIAL_RECIPES);
-    setCraftedHistory([]);
-    setSelectedCodexItem(INITIAL_INVENTORY[0]);
-    setActiveCraftingRecipe(INITIAL_RECIPES[0]);
-    localStorage.removeItem(STORAGE_KEYS.INVENTORY);
-    localStorage.removeItem(STORAGE_KEYS.RECIPES);
-    localStorage.removeItem(STORAGE_KEYS.HISTORY);
-    showToast('Restored default kitchen inventory and global recipes.');
-  };
-
-  const totals = calculatePantryTotals(inventory);
 
   return (
     <div
       id="top"
       className="min-h-screen bg-gradient-to-br from-[#FFFDF9] via-[#FFF7ED] to-[#F0FDFA] text-slate-900 pb-24 md:pb-16"
     >
-      {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-40 h-16 flex items-center justify-between gap-8 px-4 sm:px-8 bg-white/90 backdrop-blur-md border-b border-orange-200/80 shadow-sm">
-        {/* Zone 1: Warm Culinary Neon-Outlined SnapChef Brand Wordmark */}
-        <a
-          href="#top"
-          className="snapchef-logo-shell group relative inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-[#FFF7ED] via-white to-[#ECFDF5] border border-orange-200/90 whitespace-nowrap shrink-0 overflow-hidden transition-transform hover:scale-[1.02]"
+      {/* Clean, Simple Top Bar */}
+      <header className="sticky top-0 z-40 h-16 flex items-center justify-between gap-4 px-4 sm:px-8 bg-white/95 backdrop-blur-md border-b border-orange-200/80 shadow-xs">
+        {/* Brand Wordmark */}
+        <button
+          type="button"
+          onClick={() => goToStep('photos')}
+          className="snapchef-logo-shell group relative inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-[#FFF7ED] via-white to-[#ECFDF5] border border-orange-200/90 whitespace-nowrap shrink-0 overflow-hidden transition-transform hover:scale-[1.02] cursor-pointer"
         >
           <svg
             aria-hidden="true"
@@ -308,295 +359,349 @@ export default function App() {
             />
           </svg>
 
-          <span className="relative z-10 flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[#FF5A1F] via-[#F97316] to-[#F59E0B] text-white shadow-sm shadow-orange-500/30 ring-2 ring-orange-200/70">
+          <span className="relative z-10 flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[#FF5A1F] via-[#F97316] to-[#F59E0B] text-white shadow-xs">
             <ChefHat className="w-4 h-4 stroke-[2.4]" />
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
           </span>
 
           <span className="relative z-10 font-display text-xl sm:text-2xl font-extrabold tracking-tight flex items-center">
             <span className="text-slate-900">Snap</span>
             <span className="snapchef-chef-gradient">Chef</span>
           </span>
-        </a>
+        </button>
 
-        {/* Zone 2: 5 concise single-line text navigation links */}
+        {/* Simple 4-Step Menu Navigation */}
         <nav
-          aria-label="Primary Navigation"
+          aria-label="Simple Step Navigation"
           className="hidden md:flex items-center gap-6 text-sm font-bold text-slate-600"
         >
           <button
             type="button"
-            onClick={() => scrollToSection('scanner')}
-            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'scanner' ? 'text-[#FF5A1F]' : ''
+            onClick={() => goToStep('photos')}
+            className={`hover:text-[#FF5A1F] transition-colors cursor-pointer ${
+              activeStep === 'photos'
+                ? 'text-[#FF5A1F] underline underline-offset-8 decoration-2'
+                : ''
             }`}
           >
-            Scanner
+            1. Add Photos ({photos.length})
           </button>
           <button
             type="button"
-            onClick={() => scrollToSection('codex')}
-            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'codex' ? 'text-[#FF5A1F]' : ''
+            onClick={() => goToStep('preferences')}
+            className={`hover:text-[#FF5A1F] transition-colors cursor-pointer ${
+              activeStep === 'preferences'
+                ? 'text-[#FF5A1F] underline underline-offset-8 decoration-2'
+                : ''
             }`}
           >
-            Ingredient Codex
+            2. People & Diet ({servings})
           </button>
           <button
             type="button"
-            onClick={() => scrollToSection('recipes')}
-            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'recipes' ? 'text-[#FF5A1F]' : ''
+            onClick={() => goToStep('recipes')}
+            className={`hover:text-[#FF5A1F] transition-colors cursor-pointer ${
+              activeStep === 'recipes'
+                ? 'text-[#FF5A1F] underline underline-offset-8 decoration-2'
+                : ''
             }`}
           >
-            Recipe Synthesizer
+            3. Recipes & Missing Items
           </button>
           <button
             type="button"
-            onClick={() => scrollToSection('crafting')}
-            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'crafting' ? 'text-[#FF5A1F]' : ''
+            onClick={() => goToStep('cooking')}
+            className={`hover:text-[#FF5A1F] transition-colors cursor-pointer ${
+              activeStep === 'cooking'
+                ? 'text-[#FF5A1F] underline underline-offset-8 decoration-2'
+                : ''
             }`}
           >
-            Cooking Studio
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollToSection('macros')}
-            className={`hover:text-[#FF5A1F] transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
-              activeNav === 'macros' ? 'text-[#FF5A1F]' : ''
-            }`}
-          >
-            Macro Log
+            4. Cooking Guide
           </button>
         </nav>
 
-        {/* Zone 3: 1 primary action */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Right Actions: Relaxing Click Sound Toggle + Install App */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setSoundEnabled((prev) => !prev)}
+            className="min-h-[40px] px-3 py-1.5 rounded-xl border border-orange-200 bg-orange-50/70 hover:bg-orange-100 text-xs font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer"
+            aria-label={
+              soundEnabled
+                ? 'Mute relaxing button click sound'
+                : 'Enable relaxing button click sound'
+            }
+          >
+            {soundEnabled ? (
+              <Volume2 className="w-4 h-4 text-[#FF5A1F]" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-slate-400" />
+            )}
+            <span className="hidden sm:inline">
+              Sound: {soundEnabled ? 'On' : 'Off'}
+            </span>
+          </button>
           <PWAInstallModalTrigger variant="compact" />
         </div>
       </header>
 
-      {/* Main Responsive Container */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
-        {/* Vibrant Hero Header & Quantitative Strip */}
-        <div className="rounded-3xl border-2 border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50/70 to-teal-50/80 p-5 sm:p-7 flex flex-col lg:flex-row lg:items-end justify-between gap-4 shadow-sm">
-          <div className="max-w-2xl">
-            <p className="text-xs font-extrabold text-[#FF5A1F]">
-              Joyful AI Kitchen Companion · Point Your Camera & Cook Happy
-            </p>
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mt-1 text-balance">
-              Snap Any Ingredient. Discover Its Nutrition. Cook Joyful Global Meals.
+      {/* Main Content Container */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        {/* Beginner-Friendly Purpose & "How SnapChef Helps You" Banner */}
+        <section
+          aria-label="What is SnapChef and How to Use It"
+          className="rounded-3xl border-2 border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50/70 to-emerald-50/70 p-5 sm:p-7 shadow-xs"
+        >
+          <div className="max-w-3xl">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-[#FF5A1F] uppercase tracking-wide">
+              <HelpCircle className="w-4 h-4" />
+              <span>Welcome to SnapChef · Simple Kitchen Guide for Beginners</span>
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1.5">
+              Turn Photos of Your Kitchen Ingredients into Easy Home-Cooked Meals
             </h1>
+            <p className="text-sm sm:text-base text-slate-700 mt-2 leading-relaxed">
+              <strong>Purpose of this app:</strong> SnapChef helps anyone figure
+              out what to cook when staring at random vegetables and spices in
+              the kitchen. Just upload photos of each ingredient you have, tell
+              us how many people you&apos;re cooking for and your diet, and we
+              recommend delicious recipes—while clearly listing{' '}
+              <strong>which extra vegetables or spices are lacking</strong> to
+              complete each dish.
+            </p>
           </div>
 
-          {/* Unboxed Quantitative Telemetry Summary */}
-          <div className="flex flex-wrap items-center gap-3.5 text-xs font-mono font-bold tabular-nums text-slate-700">
-            <span>
-              Kitchen:{' '}
-              <strong className="text-slate-950">{totals.totalItems} Items</strong>
-            </span>
-            <span aria-hidden="true" className="text-orange-300">
-              ·
-            </span>
-            <span>
-              Energy:{' '}
-              <strong className="text-[#EA580C]">
-                {totals.totalCalories} kcal
-              </strong>
-            </span>
-            <span aria-hidden="true" className="text-orange-300">
-              ·
-            </span>
-            <span>
-              Protein:{' '}
-              <strong className="text-emerald-700">
-                {totals.totalProteinG}g
-              </strong>
-            </span>
-            <span aria-hidden="true" className="text-orange-300">
-              ·
-            </span>
-            <span>
-              Recipes Ready:{' '}
-              <strong className="text-rose-600">{recipes.length}</strong>
-            </span>
-          </div>
-        </div>
+          {/* Interactive 3-Step Beginner Progress Bar */}
+          <div className="mt-5 pt-4 border-t border-orange-200/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => goToStep('photos')}
+              className={`rounded-2xl border p-3.5 text-left transition-all flex items-start gap-3 cursor-pointer ${
+                activeStep === 'photos'
+                  ? 'border-[#FF5A1F] bg-white shadow-sm'
+                  : 'border-orange-200/70 bg-white/70 hover:bg-white'
+              }`}
+            >
+              <span className="w-7 h-7 rounded-lg bg-[#FF5A1F] text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                1
+              </span>
+              <div>
+                <p className="text-xs sm:text-sm font-extrabold text-slate-900">
+                  Add Ingredient Photos
+                </p>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  Snap or upload multiple photos ({photos.length} added)
+                </p>
+              </div>
+            </button>
 
-        {/* Toast Feedback Banner */}
+            <button
+              type="button"
+              onClick={() => goToStep('preferences')}
+              className={`rounded-2xl border p-3.5 text-left transition-all flex items-start gap-3 cursor-pointer ${
+                activeStep === 'preferences'
+                  ? 'border-[#FF5A1F] bg-white shadow-sm'
+                  : 'border-orange-200/70 bg-white/70 hover:bg-white'
+              }`}
+            >
+              <span className="w-7 h-7 rounded-lg bg-amber-500 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                2
+              </span>
+              <div>
+                <p className="text-xs sm:text-sm font-extrabold text-slate-900">
+                  People Count & Diet
+                </p>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {servings} {servings === 1 ? 'Person' : 'People'} ·{' '}
+                  {dietaryRestriction}
+                </p>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => goToStep('recipes')}
+              className={`rounded-2xl border p-3.5 text-left transition-all flex items-start gap-3 cursor-pointer ${
+                activeStep === 'recipes' || activeStep === 'cooking'
+                  ? 'border-[#FF5A1F] bg-white shadow-sm'
+                  : 'border-orange-200/70 bg-white/70 hover:bg-white'
+              }`}
+            >
+              <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
+                3
+              </span>
+              <div>
+                <p className="text-xs sm:text-sm font-extrabold text-slate-900">
+                  Recipes & Lacking Items
+                </p>
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {recipes.length} dishes + missing veg & spices
+                </p>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        {/* Optional Status Toast */}
         {statusToast && (
           <div
             role="status"
-            className="mt-4 rounded-2xl border-2 border-emerald-400 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-bold text-emerald-900 flex flex-wrap items-center justify-between gap-3 shadow-md"
+            className="mt-4 rounded-2xl border border-emerald-400 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-bold text-emerald-900 flex items-center justify-between gap-3"
           >
-            <span>{statusToast}</span>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => scrollToSection('codex')}
-                className="px-3 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer"
-              >
-                View Scanned Item
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatusToast(null)}
-                className="text-xs text-emerald-700 hover:text-emerald-950 cursor-pointer"
-              >
-                Close
-              </button>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{statusToast}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setStatusToast(null)}
+              className="text-xs text-emerald-700 hover:text-emerald-950 cursor-pointer"
+            >
+              Close
+            </button>
           </div>
         )}
 
-        {/* Section 1: Browser-Native Camera Scanner ("The Eye") */}
-        <div ref={scannerRef} className="scroll-mt-20 mt-6">
-          <CameraScannerEye
-            onScanComplete={handleScanComplete}
-            onAddSingleIngredient={handleAddSingleIngredient}
-            onSelectRecipeForCrafting={handleSelectRecipeForCrafting}
-            activeMealFilter={activeMealFilter}
-            inventoryCount={inventory.length}
-          />
-        </div>
+        {/* Active Step View — Only 1 focused step visible at a time so beginners are never confused */}
+        <div className="mt-6">
+          {activeStep === 'photos' && (
+            <CameraScannerEye
+              photos={photos}
+              onAddPhotoToTray={handleAddPhotoToTray}
+              onRemovePhotoFromTray={handleRemovePhotoFromTray}
+              onLoadPresetPhotos={handleLoadPresetPhotos}
+              onProceedToServings={() => goToStep('preferences')}
+            />
+          )}
 
-        {/* Section 2: Interactive Inventory Loot Grid & Deep Ingredient Codex */}
-        <div ref={codexRef} className="scroll-mt-20">
-          <InventoryLootGrid
-            inventory={inventory}
-            selectedItem={selectedCodexItem}
-            onSelectItem={(item) => setSelectedCodexItem(item)}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onNavigateToRecipes={() => scrollToSection('recipes')}
-          />
-        </div>
+          {activeStep === 'preferences' && (
+            <ServingsAndDietStep
+              photos={photos}
+              inventory={inventory}
+              servings={servings}
+              onSelectServings={(count) => setServings(count)}
+              dietaryRestriction={dietaryRestriction}
+              onSelectDiet={(diet) => setDietaryRestriction(diet)}
+              isSynthesizing={isSynthesizingStep2}
+              onGenerateRecipes={handleGenerateRecipesFromStep2}
+              onBackToPhotos={() => goToStep('photos')}
+            />
+          )}
 
-        {/* Section 3: Global Recipe Synthesizer */}
-        <div ref={recipesRef} className="scroll-mt-20">
-          <RecipeSynthesizer
-            recipes={recipes}
-            inventory={inventory}
-            activeMealFilter={activeMealFilter}
-            onMealFilterChange={(meal) => setActiveMealFilter(meal)}
-            onSelectRecipeForCrafting={handleSelectRecipeForCrafting}
-            onSynthesizedRecipes={(newRecs) => setRecipes(newRecs)}
-          />
-        </div>
+          {activeStep === 'recipes' && (
+            <RecipeSynthesizer
+              recipes={recipes}
+              inventory={inventory}
+              servings={servings}
+              dietaryRestriction={dietaryRestriction}
+              activeMealFilter={activeMealFilter}
+              onMealFilterChange={(meal) => setActiveMealFilter(meal)}
+              onSelectRecipeForCrafting={handleSelectRecipeForCrafting}
+              onSynthesizedRecipes={(newRecs) => setRecipes(newRecs)}
+              onBackToServings={() => goToStep('preferences')}
+              onBackToPhotos={() => goToStep('photos')}
+            />
+          )}
 
-        {/* Section 4: Interactive Cooking Studio (Crafting Mode HUD) */}
-        <div ref={craftingRef} className="scroll-mt-20">
-          <CraftingModeHUD
-            recipe={activeCraftingRecipe}
-            onCompleteCrafting={handleCompleteCrafting}
-            onBackToRecipes={() => scrollToSection('recipes')}
-          />
-        </div>
-
-        {/* Section 5: Pantry Telemetry, Crafted Meal History & PWA Install */}
-        <div ref={macrosRef} className="scroll-mt-20">
-          <NutritionLogSection
-            inventory={inventory}
-            craftedHistory={craftedHistory}
-            onResetDemoData={handleResetDemoData}
-          />
+          {activeStep === 'cooking' && (
+            <CraftingModeHUD
+              recipe={activeCraftingRecipe}
+              onCompleteCrafting={handleCompleteCrafting}
+              onBackToRecipes={() => goToStep('recipes')}
+            />
+          )}
         </div>
       </main>
 
-      {/* Quiet Footer */}
-      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-14 pt-6 border-t border-orange-200/70 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-600">
+      {/* Simple Quiet Footer */}
+      <footer className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t border-orange-200/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
         <p>
-          SnapChef — Joyful AI Kitchen Inventory & Global Recipe Synthesizer · Built for Mobile & Desktop
+          SnapChef — Simple Multi-Photo Ingredient Scanner & Recipe Guide
         </p>
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => scrollToSection('scanner')}
+            onClick={() => goToStep('photos')}
             className="hover:text-[#FF5A1F] cursor-pointer"
           >
-            Camera Scanner
+            1. Add Photos
           </button>
           <span aria-hidden="true">·</span>
           <button
             type="button"
-            onClick={() => scrollToSection('recipes')}
+            onClick={() => goToStep('preferences')}
             className="hover:text-[#FF5A1F] cursor-pointer"
           >
-            Global Recipes
+            2. People & Diet
           </button>
           <span aria-hidden="true">·</span>
           <button
             type="button"
-            onClick={handleResetDemoData}
+            onClick={() => goToStep('recipes')}
             className="hover:text-[#FF5A1F] cursor-pointer"
           >
-            Reset Pantry
+            3. Recipes
           </button>
         </div>
       </footer>
 
-      {/* Offline Mode Indicator */}
       <OfflineIndicator />
 
-      {/* Mobile Bottom Navigation Bar (Android / iPhone Thumb Zone, <= 15% total sticky cap) */}
+      {/* Mobile Bottom Navigation Bar */}
       <nav
-        aria-label="Mobile Bottom Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-orange-200 grid grid-cols-5 items-center h-14 pb-safe px-1 shadow-lg"
+        aria-label="Mobile Step Navigation"
+        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-orange-200 grid grid-cols-4 items-center h-14 pb-safe px-1 shadow-lg"
       >
         <button
           type="button"
-          onClick={() => scrollToSection('scanner')}
+          onClick={() => goToStep('photos')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'scanner' ? 'text-[#FF5A1F] font-bold' : 'text-slate-500'
+            activeStep === 'photos'
+              ? 'text-[#FF5A1F] font-bold'
+              : 'text-slate-500'
           }`}
         >
           <Camera className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Scan</span>
+          <span className="text-[10px] mt-0.5">1. Photos</span>
         </button>
 
         <button
           type="button"
-          onClick={() => scrollToSection('codex')}
+          onClick={() => goToStep('preferences')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'codex' ? 'text-emerald-600 font-bold' : 'text-slate-500'
+            activeStep === 'preferences'
+              ? 'text-amber-600 font-bold'
+              : 'text-slate-500'
           }`}
         >
-          <BookOpen className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Codex</span>
+          <Users className="w-4 h-4" />
+          <span className="text-[10px] mt-0.5">2. People</span>
         </button>
 
         <button
           type="button"
-          onClick={() => scrollToSection('recipes')}
+          onClick={() => goToStep('recipes')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'recipes' ? 'text-[#FF5A1F] font-bold' : 'text-slate-500'
+            activeStep === 'recipes'
+              ? 'text-emerald-600 font-bold'
+              : 'text-slate-500'
           }`}
         >
           <ChefHat className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Recipes</span>
+          <span className="text-[10px] mt-0.5">3. Recipes</span>
         </button>
 
         <button
           type="button"
-          onClick={() => scrollToSection('crafting')}
+          onClick={() => goToStep('cooking')}
           className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'crafting' ? 'text-rose-600 font-bold' : 'text-slate-500'
+            activeStep === 'cooking'
+              ? 'text-rose-600 font-bold'
+              : 'text-slate-500'
           }`}
         >
           <Flame className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Cook</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => scrollToSection('macros')}
-          className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeNav === 'macros' ? 'text-teal-600 font-bold' : 'text-slate-500'
-          }`}
-        >
-          <Activity className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">Macros</span>
+          <span className="text-[10px] mt-0.5">4. Cook</span>
         </button>
       </nav>
     </div>

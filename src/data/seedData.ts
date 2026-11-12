@@ -1,4 +1,9 @@
-import type { InventoryItem, RecipeItem, SnapChefPayload } from '../types/snapchef';
+import type {
+  CapturedIngredientPhoto,
+  InventoryItem,
+  RecipeItem,
+  SnapChefPayload,
+} from '../types/snapchef';
 
 export const INITIAL_INVENTORY: InventoryItem[] = [
   {
@@ -280,18 +285,26 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
+    missing_vegetables: [
+      'Fresh Coriander Leaves (Cilantro)',
+      '1 Green Chili or Sweet Bell Pepper',
+    ],
+    missing_spices: [
+      '1/2 tsp Garam Masala',
+      '1/2 tsp Dry Mango Powder (Amchur) or Lemon Juice',
+    ],
     chef_note:
       'Morning breakfast skillet using your Potatoes, Spices, and Butter: par-steamed potato dice seared in foaming cumin-turmeric butter.',
     steps: [
       {
         instruction:
-          'Dice 250g Potatoes into small 1cm breakfast hash cubes. Rinse in cold water to remove excess surface starch and pat thoroughly dry.',
+          'Dice Potatoes into small 1cm breakfast hash cubes. Rinse in cold water to remove excess surface starch and pat thoroughly dry.',
         timer_seconds: 120,
         tip: 'Dry potato cubes crisp twice as fast when they hit the melted butter.',
       },
       {
         instruction:
-          'Melt 1.5 tbsp Cultured Creamery Butter in a wide skillet over medium heat. Add whole cumin seeds and finely diced red onion until golden and fragrant.',
+          'Melt Cultured Creamery Butter in a wide skillet over medium heat. Add whole cumin seeds and finely diced red onion until golden and fragrant.',
         timer_seconds: 90,
       },
       {
@@ -318,17 +331,25 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
+    missing_vegetables: [
+      'Fresh Chives or Spring Onion Greens',
+      '1 Clove Fresh Garlic',
+    ],
+    missing_spices: [
+      'Freshly Cracked Black Pepper',
+      'Pinch of Grated Nutmeg or Rosemary',
+    ],
     chef_note:
       'Shredded potatoes bound by their own natural starch and pan-fried in nutty brown butter with warm aromatic spices.',
     steps: [
       {
         instruction:
-          'Coarsely grate 300g peeled Potatoes and squeeze out excess liquid in a clean kitchen towel. Toss with salt, black pepper, and a pinch of roasted cumin.',
+          'Coarsely grate peeled Potatoes and squeeze out excess liquid in a clean kitchen towel. Toss with salt, black pepper, and a pinch of roasted cumin.',
         timer_seconds: 180,
       },
       {
         instruction:
-          'Melt 2 tbsp Cultured Creamery Butter in a skillet until it foams and smells nutty. Press the shredded potatoes into a flat, even pancake.',
+          'Melt Cultured Creamery Butter in a skillet until it foams and smells nutty. Press the shredded potatoes into a flat, even pancake.',
         timer_seconds: 300,
       },
       {
@@ -354,18 +375,26 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
+    missing_vegetables: [
+      'Fresh Ginger (1 inch julienned)',
+      'Fresh Coriander Leaves (Cilantro)',
+    ],
+    missing_spices: [
+      '1 tsp Roasted Coriander Powder (Dhania)',
+      'Dried Fenugreek Leaves (Kasuri Methi)',
+    ],
     chef_note:
-      'Zero missing ingredients. Cooling boiled potatoes briefly increases resistant starch and keeps edges crisp during cumin-butter tempering.',
+      'Cooling boiled potatoes briefly increases resistant starch and keeps edges crisp during cumin-butter tempering.',
     steps: [
       {
         instruction:
-          'Peel and dice 300g of Potatoes into uniform 2cm cubes. Boil in salted water until fork-tender without breaking apart.',
+          'Peel and dice Potatoes into uniform 2cm cubes. Boil in salted water until fork-tender without breaking apart.',
         timer_seconds: 600,
         tip: 'Keep a clean edge on the cubes so they sear cleanly in the spiced butter.',
       },
       {
         instruction:
-          'Melt 1.5 tbsp Cultured Creamery Butter in a skillet over medium-high heat. Temper whole cumin seeds until they crackle and release roasted aroma.',
+          'Melt Cultured Creamery Butter in a skillet over medium-high heat. Temper whole cumin seeds until they crackle and release roasted aroma.',
         timer_seconds: 45,
         tip: 'Watch for a golden-brown tint on the cumin seeds before adding turmeric.',
       },
@@ -392,12 +421,20 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
+    missing_vegetables: [
+      '2 Ripe Vine Tomatoes (for Bravas sauce)',
+      '2 Cloves Fresh Garlic & Flat-Leaf Parsley',
+    ],
+    missing_spices: [
+      '1 tsp Smoked Spanish Paprika (Pimentón)',
+      'Pinch of Cayenne Pepper & Oregano',
+    ],
     chef_note:
       'Crispy tavern-style potato wedges glazed in an emulsified warm spice and butter pan sauce.',
     steps: [
       {
         instruction:
-          'Cut 300g Potatoes into rustic 3cm wedges and parboil in salted water for 7 minutes until edges are slightly softened.',
+          'Cut Potatoes into rustic 3cm wedges and parboil in salted water for 7 minutes until edges are slightly softened.',
         timer_seconds: 420,
       },
       {
@@ -407,7 +444,7 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       },
       {
         instruction:
-          'Lower heat, add 1 tbsp cold Cultured Creamery Butter and warm spices (cumin, paprika/chili, turmeric), and toss vigorously to glaze every wedge.',
+          'Lower heat, add cold Cultured Creamery Butter and warm spices (cumin, paprika/chili, turmeric), and toss vigorously to glaze every wedge.',
         timer_seconds: 90,
       },
     ],
@@ -428,17 +465,25 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
+    missing_vegetables: [
+      'Fresh Curry Leaves or Cilantro Stems',
+      '2 Cloves Crushed Garlic',
+    ],
+    missing_spices: [
+      '1/2 tsp Black Mustard Seeds (Rai)',
+      '1/2 tsp Kashmiri Red Chili Powder',
+    ],
     chef_note:
       'Basting halved potatoes in foaming spiced butter creates a steakhouse-style crust with a melt-in-the-mouth center for dinner.',
     steps: [
       {
         instruction:
-          'Halve 350g Potatoes lengthwise and score the flat cut faces in a shallow diamond crosshatch pattern so spiced butter penetrates deep inside.',
+          'Halve Potatoes lengthwise and score the flat cut faces in a shallow diamond crosshatch pattern so spiced butter penetrates deep inside.',
         timer_seconds: 120,
       },
       {
         instruction:
-          'Place cut-side down in a skillet with 2 tbsp Cultured Creamery Butter over medium heat and sear for 8 minutes until deeply caramelized.',
+          'Place cut-side down in a skillet with Cultured Creamery Butter over medium heat and sear for 8 minutes until deeply caramelized.',
         timer_seconds: 480,
       },
       {
@@ -464,6 +509,14 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
+    missing_vegetables: [
+      '1 Fresh Lime & Scallions (Green Onions)',
+      '1 Yellow Bell Pepper or Mild Chili',
+    ],
+    missing_spices: [
+      'Ground Coriander & Smoked Paprika',
+      'Coarse Sea Salt & Cracked Black Pepper',
+    ],
     chef_note:
       'Inspired by Peruvian and Colombian highland skillet potatoes smashed and crisped in aromatic golden butter.',
     steps: [
@@ -474,7 +527,7 @@ export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
       },
       {
         instruction:
-          'Sauté diced red onion, cumin, and turmeric in 2 tbsp Cultured Creamery Butter over medium-high heat until glossy and aromatic.',
+          'Sauté diced red onion, cumin, and turmeric in Cultured Creamery Butter over medium-high heat until glossy and aromatic.',
         timer_seconds: 120,
       },
       {
@@ -743,4 +796,65 @@ export const SCAN_PRESET_SCENES: ScanPresetScene[] = [
     },
   },
 ];
+
+export function makeIngredientThumbSvg(
+  title: string,
+  subtitle: string,
+  accentHex = '#FF5A1F',
+  bgHex = '#FFF7ED'
+): string {
+  const safeTitle = title.replace(/&/g, '&amp;').slice(0, 26);
+  const safeSub = subtitle.replace(/&/g, '&amp;').slice(0, 34);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+    <rect width="320" height="200" rx="18" fill="${bgHex}" />
+    <rect x="8" y="8" width="304" height="184" rx="14" fill="none" stroke="${accentHex}" stroke-width="2.5" stroke-dasharray="6 4" opacity="0.55" />
+    <circle cx="52" cy="64" r="24" fill="${accentHex}" opacity="0.16" />
+    <circle cx="52" cy="64" r="10" fill="${accentHex}" />
+    <text x="90" y="60" font-family="sans-serif" font-size="17" font-weight="800" fill="#0F172A">${safeTitle}</text>
+    <text x="90" y="82" font-family="sans-serif" font-size="12" font-weight="600" fill="#475569">${safeSub}</text>
+    <rect x="24" y="122" width="272" height="46" rx="10" fill="#FFFFFF" stroke="#E2E8F0" />
+    <text x="38" y="150" font-family="monospace" font-size="12" font-weight="700" fill="${accentHex}">SNAPCHEF INGREDIENT PHOTO</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+export const INITIAL_PHOTO_TRAY: CapturedIngredientPhoto[] = [
+  {
+    id: 'photo-1-potato',
+    label: 'Photo #1: Potatoes (450g)',
+    previewUrl: makeIngredientThumbSvg(
+      'Fresh Potatoes',
+      'Vegetable · 450g · 77 kcal/100g',
+      '#EA580C',
+      '#FFF7ED'
+    ),
+    detectedItems: [INITIAL_INVENTORY[0]],
+    capturedAt: 'Photo 1',
+  },
+  {
+    id: 'photo-2-butter',
+    label: 'Photo #2: Cultured Creamery Butter',
+    previewUrl: makeIngredientThumbSvg(
+      'Creamery Butter',
+      'Dairy · 200g · 717 kcal/100g',
+      '#D97706',
+      '#FEFCE8'
+    ),
+    detectedItems: [INITIAL_INVENTORY[1]],
+    capturedAt: 'Photo 2',
+  },
+  {
+    id: 'photo-3-spices',
+    label: 'Photo #3: Cumin, Turmeric & Onion Spices',
+    previewUrl: makeIngredientThumbSvg(
+      'Cumin & Turmeric Spices',
+      'Spices · 200g · 110 kcal/100g',
+      '#059669',
+      '#ECFDF5'
+    ),
+    detectedItems: [INITIAL_INVENTORY[2]],
+    capturedAt: 'Photo 3',
+  },
+];
+
 
