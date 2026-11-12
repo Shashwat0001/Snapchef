@@ -455,6 +455,7 @@ export default function App() {
           <CameraScannerEye
             onScanComplete={handleScanComplete}
             onAddSingleIngredient={handleAddSingleIngredient}
+            onSelectRecipeForCrafting={handleSelectRecipeForCrafting}
             activeMealFilter={activeMealFilter}
             inventoryCount={inventory.length}
           />

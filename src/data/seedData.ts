@@ -17,7 +17,67 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Solanum tuberosum — Starchy tuberous root vegetable native to the Andean highlands of the Americas, widely cultivated as a global dietary staple.',
+    qualities: {
+      texture_and_freshness:
+        'Firm, high-dry-matter tuber with smooth skin and zero sprouting',
+      flavor_profile:
+        'Mild, earthy sweetness that absorbs spiced butter and aromatics deeply',
+      cooking_behavior:
+        'Forms a shatteringly crisp golden crust when pan-seared in butter while staying fluffy inside',
+    },
     confidence: 99,
+  },
+  {
+    id: 'inv-butter',
+    name: 'Cultured Creamery Butter',
+    category: 'Dairy',
+    quantity_g: 200,
+    unit_label: '1 chilled block',
+    freshness_days: 30,
+    calories_per_100g: 717,
+    macros: { protein_g: 0.9, carbs_g: 0.1, fat_g: 81.1 },
+    health_benefits: [
+      'Rich in short-chain butyrate fatty acids supporting colonocytes and gut barrier integrity',
+      'Provides fat-soluble Vitamins A, D, E, and K2 (menaquinone) for nutrient absorption',
+      'Enhances bioavailability of fat-soluble curcuminoids and carotenoids in spices',
+    ],
+    source_details:
+      'Churned bovine milkfat emulsion containing 81% butterfat, milk solids, and trace diacetyl aroma compounds.',
+    qualities: {
+      texture_and_freshness:
+        'Velvety, plastic emulsion at cool room temperature with sweet cream aroma',
+      flavor_profile:
+        'Rich, nutty dairy notes that bloom into toasted hazelnut when browned (beurre noisette)',
+      cooking_behavior:
+        'Milk solids caramelize at 150°C, blooming whole cumin and turmeric spices instantly',
+    },
+    confidence: 99,
+  },
+  {
+    id: 'inv-cumin-spices',
+    name: 'Cumin, Turmeric & Red Onion Pantry Set',
+    category: 'Spice',
+    quantity_g: 200,
+    unit_label: 'Masala & aromatics',
+    freshness_days: 30,
+    calories_per_100g: 110,
+    macros: { protein_g: 3.5, carbs_g: 21.0, fat_g: 1.4 },
+    health_benefits: [
+      'Cuminaldehyde stimulates pancreatic digestive enzyme secretion',
+      'Curcuminoids and quercetin modulate inflammatory pathways',
+      'Organosulfur compounds support cardiovascular endothelial health',
+    ],
+    source_details:
+      'Cuminum cyminum seeds, Curcuma longa rhizome powder, and Allium cepa bulbs — foundational aromatic triad for tempering (tadka) and sofrito.',
+    qualities: {
+      texture_and_freshness:
+        'Whole volatile-oil-rich cumin seeds, vibrant golden turmeric, and crisp red onion layers',
+      flavor_profile:
+        'Warm, toasted-earthy cumin paired with peppery golden turmeric and sweet-savory allium',
+      cooking_behavior:
+        'Fat-soluble essential oils release within 15 seconds when tempered in hot melted butter',
+    },
+    confidence: 98,
   },
   {
     id: 'inv-paneer',
@@ -35,6 +95,14 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Non-aged, non-melting acid-set farmer cheese native to the Indian subcontinent, coagulated from heated whole milk with food acid.',
+    qualities: {
+      texture_and_freshness:
+        'Moist, springy, tightly knit milk curd block with clean milky scent',
+      flavor_profile:
+        'Delicate sweet-milk tang that acts as a high-protein sponge for spiced gravies',
+      cooking_behavior:
+        'Non-melting protein network sears to a golden crust on a hot griddle without losing shape',
+    },
     confidence: 98,
   },
   {
@@ -53,6 +121,14 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Gallus gallus domesticus ova — Nutrient-dense avian reproductive cell composed of a lipid-rich vitellus (yolk) suspended in ovalbumin protein.',
+    qualities: {
+      texture_and_freshness:
+        'Thick, dome-standing amber yolks with tight, viscous albumen',
+      flavor_profile:
+        'Rich, savory yolk creaminess that emulsifies butter and starch dishes',
+      cooking_behavior:
+        'Albumen sets at 62°C while yolk thickens at 65°C for silky scrambles and frittatas',
+    },
     confidence: 99,
   },
   {
@@ -71,6 +147,14 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Spinacia oleracea — Leafy green flowering plant native to central and western Asia belonging to the Amaranthaceae family.',
+    qualities: {
+      texture_and_freshness:
+        'Crisp, turgid emerald leaves with tender edible stems',
+      flavor_profile:
+        'Clean, vegetal mineral sweetness without mature-leaf bitterness',
+      cooking_behavior:
+        'Wilts in 60 seconds in warm spiced butter while retaining bright chlorophyll color',
+    },
     confidence: 97,
   },
   {
@@ -89,6 +173,14 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Cicer arietinum (Garbanzo) — Ancient Fabaceae pulse domesticated in the Fertile Crescent over 9,000 years ago.',
+    qualities: {
+      texture_and_freshness:
+        'Plump, creamy-centered legumes with intact skins',
+      flavor_profile:
+        'Nutty, chestnut-like savoriness that pairs with cumin, butter, and citrus',
+      cooking_behavior:
+        'Blisters to a crunchy exterior when pan-roasted or mashes into velvety stews',
+    },
     confidence: 96,
   },
   {
@@ -107,6 +199,14 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Solanum lycopersicum — Botanical berry of the nightshade family indigenous to western South America and domesticated in Mesoamerica.',
+    qualities: {
+      texture_and_freshness:
+        'Glossy crimson skin with juicy, glutamate-rich seed gel',
+      flavor_profile:
+        'Bright malic/citric acidity balanced by natural fructose and umami',
+      cooking_behavior:
+        'Breaks down into a glossy, emulsified pan sauce when simmered with butter and spices',
+    },
     confidence: 98,
   },
   {
@@ -125,25 +225,15 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Oryza sativa de-husked grain parboiled, rolled, and flattened into dry light flakes; staple across Western and Central India.',
+    qualities: {
+      texture_and_freshness:
+        'Dry, translucent medium-thick rice flakes that hydrate in 2 minutes',
+      flavor_profile:
+        'Toasted grain subtlety that carries turmeric, cumin, and potato',
+      cooking_behavior:
+        'Steams into light, fluffy individual grains after a brief colander rinse',
+    },
     confidence: 95,
-  },
-  {
-    id: 'inv-black-beans',
-    name: 'Black Turtle Beans',
-    category: 'Legume',
-    quantity_g: 300,
-    unit_label: '1 cooked bowl',
-    freshness_days: 5,
-    calories_per_100g: 132,
-    macros: { protein_g: 8.9, carbs_g: 23.7, fat_g: 0.5 },
-    health_benefits: [
-      'Seed coat anthocyanins (delphinidin, petunidin) provide potent antioxidant activity',
-      'High magnesium and molybdenum content for enzymatic cofactors',
-      'Slow-digesting amylose starch prevents insulin spikes',
-    ],
-    source_details:
-      'Phaseolus vulgaris — Dense, shiny black legume native to the Americas and foundational to South American and Caribbean cuisines.',
-    confidence: 96,
   },
   {
     id: 'inv-cornmeal',
@@ -161,64 +251,243 @@ export const INITIAL_INVENTORY: InventoryItem[] = [
     ],
     source_details:
       'Zea mays — Hydro-thermally cooked, dried, and stone-ground white maize flour engineered for instant dough hydration in Colombian and Venezuelan arepas.',
+    qualities: {
+      texture_and_freshness:
+        'Fine, pre-gelatinized white maize meal with sweet roasted corn aroma',
+      flavor_profile:
+        'Warm toasted maize sweetness that pairs with melted butter and cheese',
+      cooking_behavior:
+        'Hydrates instantly in warm water to form pliable discs that crisp on a cast-iron skillet',
+    },
     confidence: 94,
-  },
-  {
-    id: 'inv-cumin-spices',
-    name: 'Cumin, Turmeric & Red Onion Pantry Set',
-    category: 'Spice',
-    quantity_g: 200,
-    unit_label: 'Masala & aromatics',
-    freshness_days: 30,
-    calories_per_100g: 110,
-    macros: { protein_g: 3.5, carbs_g: 21.0, fat_g: 1.4 },
-    health_benefits: [
-      'Cuminaldehyde stimulates pancreatic digestive enzyme secretion',
-      'Curcuminoids and quercetin modulate inflammatory pathways',
-      'Organosulfur compounds support cardiovascular endothelial health',
-    ],
-    source_details:
-      'Cuminum cyminum seeds, Curcuma longa rhizome powder, and Allium cepa bulbs — foundational aromatic triad for tempering (tadka) and sofrito.',
-    confidence: 97,
   },
 ];
 
-export const INITIAL_RECIPES: RecipeItem[] = [
+export const POTATO_SPICES_BUTTER_RECIPES: RecipeItem[] = [
+  {
+    id: 'rec-masala-butter-potato-hash',
+    title: 'Masala Butter Potato Hash (Crispy Aloo Makhan Nashta)',
+    cuisine: 'Indian',
+    meal_type: 'Breakfast',
+    prep_cook_minutes: 15,
+    total_calories: 310,
+    protein_g: 4.8,
+    carbs_g: 36.0,
+    fat_g: 16.5,
+    crafting_difficulty: 'Level 1',
+    used_ingredients: [
+      'Potato',
+      'Cultured Creamery Butter',
+      'Cumin, Turmeric & Red Onion Pantry Set',
+    ],
+    chef_note:
+      'Morning breakfast skillet using your Potatoes, Spices, and Butter: par-steamed potato dice seared in foaming cumin-turmeric butter.',
+    steps: [
+      {
+        instruction:
+          'Dice 250g Potatoes into small 1cm breakfast hash cubes. Rinse in cold water to remove excess surface starch and pat thoroughly dry.',
+        timer_seconds: 120,
+        tip: 'Dry potato cubes crisp twice as fast when they hit the melted butter.',
+      },
+      {
+        instruction:
+          'Melt 1.5 tbsp Cultured Creamery Butter in a wide skillet over medium heat. Add whole cumin seeds and finely diced red onion until golden and fragrant.',
+        timer_seconds: 90,
+      },
+      {
+        instruction:
+          'Toss in the potato cubes, turmeric, chili flakes, and salt. Cover for 5 minutes to steam-soften, then uncover and crisp in the spiced butter for 4 minutes.',
+        timer_seconds: 540,
+        tip: 'Let the potatoes sit undisturbed for the final 2 minutes to develop a deep golden crust.',
+      },
+    ],
+  },
+  {
+    id: 'rec-spiced-butter-rosti',
+    title: 'Swiss-European Brown-Butter & Spiced Potato Rösti',
+    cuisine: 'European',
+    meal_type: 'Breakfast',
+    prep_cook_minutes: 18,
+    total_calories: 340,
+    protein_g: 5.1,
+    carbs_g: 38.5,
+    fat_g: 18.0,
+    crafting_difficulty: 'Level 2',
+    used_ingredients: [
+      'Potato',
+      'Cultured Creamery Butter',
+      'Cumin, Turmeric & Red Onion Pantry Set',
+    ],
+    chef_note:
+      'Shredded potatoes bound by their own natural starch and pan-fried in nutty brown butter with warm aromatic spices.',
+    steps: [
+      {
+        instruction:
+          'Coarsely grate 300g peeled Potatoes and squeeze out excess liquid in a clean kitchen towel. Toss with salt, black pepper, and a pinch of roasted cumin.',
+        timer_seconds: 180,
+      },
+      {
+        instruction:
+          'Melt 2 tbsp Cultured Creamery Butter in a skillet until it foams and smells nutty. Press the shredded potatoes into a flat, even pancake.',
+        timer_seconds: 300,
+      },
+      {
+        instruction:
+          'Cook 5 minutes per side over medium heat, sliding a little extra butter around the rim until both sides are shatteringly crisp and golden brown.',
+        timer_seconds: 300,
+      },
+    ],
+  },
   {
     id: 'rec-aloo-jeera',
-    title: 'Aloo Jeera (Cumin Spiced Potatoes)',
+    title: 'Punjabi Jeera Butter Aloo (Cumin & Butter Seared Potatoes)',
     cuisine: 'Indian',
     meal_type: 'Lunch',
     prep_cook_minutes: 20,
-    total_calories: 250,
+    total_calories: 295,
     protein_g: 4.5,
     carbs_g: 38.0,
-    fat_g: 8.5,
+    fat_g: 14.5,
     crafting_difficulty: 'Level 1',
-    used_ingredients: ['Potato', 'Cumin, Turmeric & Red Onion Pantry Set'],
+    used_ingredients: [
+      'Potato',
+      'Cultured Creamery Butter',
+      'Cumin, Turmeric & Red Onion Pantry Set',
+    ],
     chef_note:
-      'Zero missing ingredients. Cooling boiled potatoes briefly increases resistant starch and keeps edges crisp during cumin tempering.',
+      'Zero missing ingredients. Cooling boiled potatoes briefly increases resistant starch and keeps edges crisp during cumin-butter tempering.',
     steps: [
       {
         instruction:
           'Peel and dice 300g of Potatoes into uniform 2cm cubes. Boil in salted water until fork-tender without breaking apart.',
-        timer_seconds: 720,
-        tip: 'Keep a clean edge on the cubes so they sear cleanly in the spice oil.',
+        timer_seconds: 600,
+        tip: 'Keep a clean edge on the cubes so they sear cleanly in the spiced butter.',
       },
       {
         instruction:
-          'Heat 1 tbsp oil in a skillet over medium-high heat. Temper whole cumin seeds until they crackle and release roasted aroma.',
+          'Melt 1.5 tbsp Cultured Creamery Butter in a skillet over medium-high heat. Temper whole cumin seeds until they crackle and release roasted aroma.',
         timer_seconds: 45,
         tip: 'Watch for a golden-brown tint on the cumin seeds before adding turmeric.',
       },
       {
         instruction:
-          'Toss drained potatoes into the infused oil with turmeric, crushed black pepper, and salt. Sear untouched for 90 seconds per side until golden crust forms.',
+          'Toss drained potatoes into the foaming spiced butter with turmeric, crushed black pepper, and salt. Sear untouched for 90 seconds per side until golden crust forms.',
         timer_seconds: 180,
-        tip: 'Finish with a squeeze of lemon or fresh greens if desired.',
       },
     ],
   },
+  {
+    id: 'rec-patatas-bravas-butter',
+    title: 'Iberian Patatas Bravas in Smoked Paprika & Garlic Butter',
+    cuisine: 'European',
+    meal_type: 'Lunch',
+    prep_cook_minutes: 22,
+    total_calories: 330,
+    protein_g: 4.9,
+    carbs_g: 39.0,
+    fat_g: 17.2,
+    crafting_difficulty: 'Level 2',
+    used_ingredients: [
+      'Potato',
+      'Cultured Creamery Butter',
+      'Cumin, Turmeric & Red Onion Pantry Set',
+    ],
+    chef_note:
+      'Crispy tavern-style potato wedges glazed in an emulsified warm spice and butter pan sauce.',
+    steps: [
+      {
+        instruction:
+          'Cut 300g Potatoes into rustic 3cm wedges and parboil in salted water for 7 minutes until edges are slightly softened.',
+        timer_seconds: 420,
+      },
+      {
+        instruction:
+          'Sear potato wedges in hot butter and oil until blistered and golden on all sides.',
+        timer_seconds: 360,
+      },
+      {
+        instruction:
+          'Lower heat, add 1 tbsp cold Cultured Creamery Butter and warm spices (cumin, paprika/chili, turmeric), and toss vigorously to glaze every wedge.',
+        timer_seconds: 90,
+      },
+    ],
+  },
+  {
+    id: 'rec-bombay-roast-potatoes',
+    title: 'Bombay Spiced Fondant Potatoes in Golden Butter',
+    cuisine: 'Indian',
+    meal_type: 'Dinner',
+    prep_cook_minutes: 25,
+    total_calories: 360,
+    protein_g: 5.2,
+    carbs_g: 41.0,
+    fat_g: 19.5,
+    crafting_difficulty: 'Level 2',
+    used_ingredients: [
+      'Potato',
+      'Cultured Creamery Butter',
+      'Cumin, Turmeric & Red Onion Pantry Set',
+    ],
+    chef_note:
+      'Basting halved potatoes in foaming spiced butter creates a steakhouse-style crust with a melt-in-the-mouth center for dinner.',
+    steps: [
+      {
+        instruction:
+          'Halve 350g Potatoes lengthwise and score the flat cut faces in a shallow diamond crosshatch pattern so spiced butter penetrates deep inside.',
+        timer_seconds: 120,
+      },
+      {
+        instruction:
+          'Place cut-side down in a skillet with 2 tbsp Cultured Creamery Butter over medium heat and sear for 8 minutes until deeply caramelized.',
+        timer_seconds: 480,
+      },
+      {
+        instruction:
+          'Flip potatoes, add cumin, turmeric, and sliced red onion to the foaming butter, cover with a splash of water, and braise-baste until tender.',
+        timer_seconds: 420,
+      },
+    ],
+  },
+  {
+    id: 'rec-andean-papas-doradas',
+    title: 'Andean Papas Doradas with Golden Turmeric-Cumin Butter',
+    cuisine: 'South American',
+    meal_type: 'Dinner',
+    prep_cook_minutes: 20,
+    total_calories: 325,
+    protein_g: 4.8,
+    carbs_g: 37.5,
+    fat_g: 17.0,
+    crafting_difficulty: 'Level 1',
+    used_ingredients: [
+      'Potato',
+      'Cultured Creamery Butter',
+      'Cumin, Turmeric & Red Onion Pantry Set',
+    ],
+    chef_note:
+      'Inspired by Peruvian and Colombian highland skillet potatoes smashed and crisped in aromatic golden butter.',
+    steps: [
+      {
+        instruction:
+          'Boil whole or halved Potatoes in salted water until tender, then drain and gently smash each piece with the flat of a fork to create craggy edges.',
+        timer_seconds: 600,
+      },
+      {
+        instruction:
+          'Sauté diced red onion, cumin, and turmeric in 2 tbsp Cultured Creamery Butter over medium-high heat until glossy and aromatic.',
+        timer_seconds: 120,
+      },
+      {
+        instruction:
+          'Add the smashed potatoes to the skillet and pan-roast in the spiced butter until the craggy edges turn crunchy and golden.',
+        timer_seconds: 240,
+      },
+    ],
+  },
+];
+
+export const INITIAL_RECIPES: RecipeItem[] = [
+  ...POTATO_SPICES_BUTTER_RECIPES.slice(0, 3),
   {
     id: 'rec-kanda-batata-poha',
     title: 'Kanda Batata Poha (Flattened Rice & Potato Skillet)',
@@ -246,7 +515,7 @@ export const INITIAL_RECIPES: RecipeItem[] = [
       },
       {
         instruction:
-          'Finely dice 1 small Potato and red onion. Temper cumin seeds in hot oil, then sauté onion and potato cubes until tender and lightly browned.',
+          'Finely dice 1 small Potato and red onion. Temper cumin seeds in hot butter or oil, then sauté onion and potato cubes until tender and lightly browned.',
         timer_seconds: 300,
       },
       {
@@ -271,10 +540,11 @@ export const INITIAL_RECIPES: RecipeItem[] = [
       'Fresh Paneer',
       'Baby Spinach',
       'Vine Tomatoes',
+      'Cultured Creamery Butter',
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
     chef_note:
-      'Packs 26.5g of complete casein and whey protein per serving using your Fresh Paneer and Baby Spinach.',
+      'Packs 26.5g of complete casein and whey protein per serving using your Fresh Paneer, Butter, and Baby Spinach.',
     steps: [
       {
         instruction:
@@ -283,7 +553,7 @@ export const INITIAL_RECIPES: RecipeItem[] = [
       },
       {
         instruction:
-          'Sauté diced red onion, cumin seeds, and chopped Vine Tomatoes in a pan until tomatoes soften into a glossy masala base.',
+          'Sauté diced red onion, cumin seeds, and chopped Vine Tomatoes in melted butter until tomatoes soften into a glossy masala base.',
         timer_seconds: 300,
       },
       {
@@ -311,11 +581,11 @@ export const INITIAL_RECIPES: RecipeItem[] = [
       'Cumin, Turmeric & Red Onion Pantry Set',
     ],
     chef_note:
-      'Authentic Iberian tavern staple requiring only Eggs, Potatoes, Onion, oil, and salt.',
+      'Authentic Iberian tavern staple requiring only Eggs, Potatoes, Onion, butter/oil, and salt.',
     steps: [
       {
         instruction:
-          'Thinly slice 200g Potatoes and half a red onion. Gently poach-fry them in olive oil over medium-low heat until silky and tender.',
+          'Thinly slice 200g Potatoes and half a red onion. Gently poach-fry them in butter and olive oil over medium-low heat until silky and tender.',
         timer_seconds: 600,
       },
       {
@@ -369,43 +639,6 @@ export const INITIAL_RECIPES: RecipeItem[] = [
     ],
   },
   {
-    id: 'rec-arepas-domino',
-    title: 'Arepas Domino con Caraotas (Griddled Corn Cakes & Spiced Black Beans)',
-    cuisine: 'South American',
-    meal_type: 'Dinner',
-    prep_cook_minutes: 22,
-    total_calories: 445,
-    protein_g: 22.0,
-    carbs_g: 58.0,
-    fat_g: 12.5,
-    crafting_difficulty: 'Level 2',
-    used_ingredients: [
-      'Precooked White Cornmeal (Masarepa)',
-      'Black Turtle Beans',
-      'Fresh Paneer',
-      'Cumin, Turmeric & Red Onion Pantry Set',
-    ],
-    chef_note:
-      'Traditional Venezuelan & Colombian griddled corn cakes stuffed with savory black beans and crumbled fresh farmer cheese.',
-    steps: [
-      {
-        instruction:
-          'Hydrate 120g Precooked White Cornmeal (Masarepa) in warm salted water, knead for 2 minutes, and rest so the corn flour absorbs water evenly.',
-        timer_seconds: 300,
-      },
-      {
-        instruction:
-          'Shape into two flat discs and sear on a lightly oiled cast-iron skillet over medium heat until golden-brown crusts form on both sides.',
-        timer_seconds: 480,
-      },
-      {
-        instruction:
-          'Simmer Black Turtle Beans with diced onion, tomato, and cumin until thick. Split warm arepas open and stuff with beans and crumbled Fresh Paneer.',
-        timer_seconds: 240,
-      },
-    ],
-  },
-  {
     id: 'rec-andean-chickpea-ceviche',
     title: 'Andean Citrus Tomato & Chickpea Ceviche Fresco',
     cuisine: 'South American',
@@ -432,7 +665,7 @@ export const INITIAL_RECIPES: RecipeItem[] = [
       },
       {
         instruction:
-          'Finely julienne red onion and dice Vine Tomatoes. Toss with Cooked Chickpeas, salt, black pepper, and tangy citrus/tomato juice (leche de tigre style).',
+          'Finely julienne red onion and dice Vine Tomatoes. Toss with Cooked Chickpeas, salt, black pepper, and tangy citrus/tomato juice.',
         timer_seconds: 180,
       },
       {
@@ -454,64 +687,60 @@ export interface ScanPresetScene {
 
 export const SCAN_PRESET_SCENES: ScanPresetScene[] = [
   {
+    id: 'scene-potato-spices-butter',
+    label: 'Potatoes, Spices & Butter Combo',
+    subtitle: 'Instant Breakfast, Lunch & Dinner recipes from Potatoes, Spices & Butter',
+    badge: '6 Meal Options',
+    payload: {
+      inventory: [
+        INITIAL_INVENTORY[0], // Potato
+        INITIAL_INVENTORY[1], // Cultured Creamery Butter
+        INITIAL_INVENTORY[2], // Cumin, Turmeric & Red Onion Spices
+      ],
+      recipes: POTATO_SPICES_BUTTER_RECIPES,
+      scan_summary:
+        'Scanned Potatoes, Aromatic Spices (Cumin, Turmeric, Onion), and Cultured Creamery Butter — unlocked 6 Breakfast, Lunch, and Dinner dishes!',
+      model_used: 'gemini-3.1-flash-lite',
+    },
+  },
+  {
     id: 'scene-full-fridge',
     label: 'Full Kitchen Stock (10 Items)',
-    subtitle: 'Vegetables, Paneer, Eggs, Chickpeas, Poha & Masarepa',
-    badge: '7 Global Dishes Ready',
+    subtitle: 'Potatoes, Butter, Spices, Paneer, Eggs, Spinach, Chickpeas & Poha',
+    badge: '8 Global Dishes',
     payload: {
       inventory: INITIAL_INVENTORY,
       recipes: INITIAL_RECIPES,
       scan_summary:
-        'Real2Sim spatial scan identified 10 overlapping perishables and pantry staples across Indian, European, and South American culinary profiles.',
-      model_used: 'gemini-4-argon',
-    },
-  },
-  {
-    id: 'scene-prd-potato',
-    label: 'PRD Codex Benchmark (Potato & Spices)',
-    subtitle: 'Exact PRD Schema verification: Potato + Aloo Jeera & Tortilla',
-    badge: 'PRD Spec Match',
-    payload: {
-      inventory: [
-        INITIAL_INVENTORY[0],
-        INITIAL_INVENTORY[2],
-        INITIAL_INVENTORY[6],
-        INITIAL_INVENTORY[9],
-      ],
-      recipes: [
-        INITIAL_RECIPES[0],
-        INITIAL_RECIPES[1],
-        INITIAL_RECIPES[3],
-      ],
-      scan_summary:
-        'Targeted vegetable basket scan detected Solanum tuberosum (Potato), Pasture-Raised Eggs, Poha, and Cumin tempering spices.',
-      model_used: 'gemini-4-argon',
+        'Spatial scan identified 10 kitchen staples and synthesized Breakfast, Lunch, and Dinner options across Indian, European, and South American cuisines.',
+      model_used: 'gemini-3.1-flash-lite',
     },
   },
   {
     id: 'scene-high-protein',
-    label: 'Athlete Macro Shelf (Paneer, Eggs & Beans)',
-    subtitle: 'High-protein vegetarian & legume synthesis',
+    label: 'High-Protein Shelf (Paneer, Eggs & Chickpeas)',
+    subtitle: 'Complete vegetarian & egg protein synthesis with leafy greens',
     badge: '20g+ Protein/Meal',
     payload: {
       inventory: [
-        INITIAL_INVENTORY[1],
-        INITIAL_INVENTORY[2],
-        INITIAL_INVENTORY[3],
-        INITIAL_INVENTORY[4],
-        INITIAL_INVENTORY[5],
-        INITIAL_INVENTORY[7],
-        INITIAL_INVENTORY[8],
-        INITIAL_INVENTORY[9],
+        INITIAL_INVENTORY[3], // Paneer
+        INITIAL_INVENTORY[4], // Eggs
+        INITIAL_INVENTORY[5], // Spinach
+        INITIAL_INVENTORY[6], // Chickpeas
+        INITIAL_INVENTORY[7], // Tomatoes
+        INITIAL_INVENTORY[1], // Butter
+        INITIAL_INVENTORY[2], // Spices
       ],
       recipes: [
-        INITIAL_RECIPES[2],
         INITIAL_RECIPES[4],
         INITIAL_RECIPES[5],
+        INITIAL_RECIPES[6],
+        POTATO_SPICES_BUTTER_RECIPES[0],
       ],
       scan_summary:
-        'High-protein shelf scan cataloged Fresh Paneer, Pasture-Raised Eggs, Chickpeas, Black Beans, and Baby Spinach.',
-      model_used: 'gemini-4-argon',
+        'High-protein shelf scan cataloged Fresh Paneer, Pasture-Raised Eggs, Chickpeas, Baby Spinach, and Butter.',
+      model_used: 'gemini-3.1-flash-lite',
     },
   },
 ];
+

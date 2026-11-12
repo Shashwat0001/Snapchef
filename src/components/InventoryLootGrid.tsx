@@ -355,6 +355,27 @@ export const InventoryLootGrid: React.FC<InventoryLootGridProps> = ({
               </p>
             </div>
 
+            {/* 1b. Specific Ingredient Qualities (Texture, Flavor, Cooking Behavior) */}
+            {activeItem.qualities && (
+              <div className="mt-4 rounded-2xl border border-teal-200 bg-white p-4 shadow-sm space-y-2.5">
+                <div className="text-xs font-bold text-teal-800">
+                  Specific Ingredient Qualities (Optical Profile)
+                </div>
+                <div className="text-xs text-slate-700">
+                  <strong className="text-emerald-800">Texture & Freshness:</strong>{' '}
+                  {activeItem.qualities.texture_and_freshness}
+                </div>
+                <div className="text-xs text-slate-700">
+                  <strong className="text-amber-800">Flavor Profile:</strong>{' '}
+                  {activeItem.qualities.flavor_profile}
+                </div>
+                <div className="text-xs text-slate-700">
+                  <strong className="text-rose-800">Cooking Behavior:</strong>{' '}
+                  {activeItem.qualities.cooking_behavior}
+                </div>
+              </div>
+            )}
+
             {/* 2. Exact Macronutrient Breakdown per 100g */}
             <div className="mt-4 rounded-2xl border border-amber-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">

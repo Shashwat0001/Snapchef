@@ -31,6 +31,12 @@ export interface MacroProfile {
   fat_g: number;
 }
 
+export interface IngredientQualities {
+  texture_and_freshness: string;
+  flavor_profile: string;
+  cooking_behavior: string;
+}
+
 export interface InventoryItem {
   id: string;
   name: string;
@@ -42,6 +48,7 @@ export interface InventoryItem {
   macros: MacroProfile;
   health_benefits: string[];
   source_details: string;
+  qualities?: IngredientQualities;
   confidence?: number;
 }
 

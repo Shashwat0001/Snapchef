@@ -41,6 +41,29 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
             .map((b) => b.trim())
         : ['Rich in essential culinary micronutrients'];
 
+      const rawQualities =
+        it.qualities && typeof it.qualities === 'object'
+          ? (it.qualities as Record<string, unknown>)
+          : {};
+
+      const qualities = {
+        texture_and_freshness:
+          typeof rawQualities.texture_and_freshness === 'string' &&
+          rawQualities.texture_and_freshness.trim()
+            ? rawQualities.texture_and_freshness.trim()
+            : 'Firm, fresh culinary grade with high nutrient retention',
+        flavor_profile:
+          typeof rawQualities.flavor_profile === 'string' &&
+          rawQualities.flavor_profile.trim()
+            ? rawQualities.flavor_profile.trim()
+            : 'Balanced natural umami and aromatic depth',
+        cooking_behavior:
+          typeof rawQualities.cooking_behavior === 'string' &&
+          rawQualities.cooking_behavior.trim()
+            ? rawQualities.cooking_behavior.trim()
+            : 'Caramelizes cleanly under pan-searing, roasting, or simmering',
+      };
+
       return {
         id:
           typeof it.id === 'string' && it.id.trim()
@@ -66,6 +89,7 @@ export function normalizeSnapChefPayload(raw: unknown): SnapChefPayload {
           typeof it.source_details === 'string' && it.source_details.trim()
             ? it.source_details.trim()
             : 'Whole culinary ingredient cataloged by SnapChef spatial scanner.',
+        qualities,
         confidence:
           typeof it.confidence === 'number'
             ? Math.min(100, Math.max(50, Math.round(it.confidence)))
