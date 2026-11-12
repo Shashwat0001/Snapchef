@@ -1,0 +1,6 @@
+{
+  "name": "SnapChef — AI Kitchen Inventory & Recipe Synthesizer",
+  "description": "A futuristic Neo-Tokyo HUD smart kitchen inventory manager and global recipe synthesizer that scans your fridge, profiles ingredient nutrition, and crafts zero-missing-ingredient meals.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

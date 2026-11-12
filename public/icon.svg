@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="112" fill="#0D0D0D"/>
+  <rect x="24" y="24" width="464" height="464" rx="92" stroke="#00F0FF" stroke-opacity="0.35" stroke-width="6"/>
+  <!-- Targeting Reticle Corners -->
+  <path d="M96 156V112C96 103.163 103.163 96 112 96H156" stroke="#00F0FF" stroke-width="14" stroke-linecap="round"/>
+  <path d="M356 96H400C408.837 96 416 103.163 416 112V156" stroke="#00F0FF" stroke-width="14" stroke-linecap="round"/>
+  <path d="M96 356V400C96 408.837 103.163 416 112 416H156" stroke="#00F0FF" stroke-width="14" stroke-linecap="round"/>
+  <path d="M416 356V400C416 408.837 408.837 416 400 416H356" stroke="#00F0FF" stroke-width="14" stroke-linecap="round"/>
+  <!-- Stylized Chef Blade + Culinary Flame / Lens -->
+  <circle cx="256" cy="256" r="88" stroke="#B8FF01" stroke-width="12" stroke-dasharray="28 14"/>
+  <circle cx="256" cy="256" r="52" fill="#00F0FF" fill-opacity="0.16" stroke="#00F0FF" stroke-width="10"/>
+  <circle cx="256" cy="256" r="16" fill="#FF2A85"/>
+  <path d="M256 132V168M256 344V380M132 256H168M344 256H380" stroke="#B8FF01" stroke-width="10" stroke-linecap="round"/>
+</svg>
