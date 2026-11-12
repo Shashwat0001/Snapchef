@@ -270,39 +270,52 @@ export default function App() {
     >
       {/* Strict 3-Zone Top Bar Contract */}
       <header className="sticky top-0 z-40 h-16 flex items-center justify-between gap-8 px-4 sm:px-8 bg-white/90 backdrop-blur-md border-b border-orange-200/80 shadow-sm">
-        {/* Zone 1: Animated Neon-Outlined SnapChef Brand Wordmark */}
+        {/* Zone 1: Warm Culinary Neon-Outlined SnapChef Brand Wordmark */}
         <a
           href="#top"
-          className="relative inline-flex items-center justify-center px-4 py-1.5 rounded-xl bg-slate-950 whitespace-nowrap shrink-0 shadow-md overflow-hidden"
+          className="snapchef-logo-shell group relative inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-[#FFF7ED] via-white to-[#ECFDF5] border border-orange-200/90 whitespace-nowrap shrink-0 overflow-hidden transition-transform hover:scale-[1.02]"
         >
           <svg
             aria-hidden="true"
             className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox="0 0 160 44"
+            viewBox="0 0 190 46"
             preserveAspectRatio="none"
           >
             <defs>
-              <linearGradient id="snapchef-neon-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#00F5D4" />
-                <stop offset="35%" stopColor="#FF2E93" />
-                <stop offset="70%" stopColor="#FFB800" />
-                <stop offset="100%" stopColor="#00F5D4" />
+              <linearGradient
+                id="snapchef-warm-neon-grad"
+                x1="0%"
+                y1="0%"
+                x2="100%"
+                y2="100%"
+              >
+                <stop offset="0%" stopColor="#FF5A1F" />
+                <stop offset="40%" stopColor="#F59E0B" />
+                <stop offset="75%" stopColor="#10B981" />
+                <stop offset="100%" stopColor="#FF5A1F" />
               </linearGradient>
             </defs>
             <rect
-              x="2"
-              y="2"
-              width="156"
-              height="40"
-              rx="10"
+              x="1.5"
+              y="1.5"
+              width="187"
+              height="43"
+              rx="14"
               fill="none"
-              stroke="url(#snapchef-neon-grad)"
+              stroke="url(#snapchef-warm-neon-grad)"
               strokeWidth="2.5"
               className="snapchef-neon-rect"
             />
           </svg>
-          <span className="snapchef-neon-text text-xl sm:text-2xl font-extrabold tracking-wider relative z-10">
-            SnapChef
+
+          <span className="relative z-10 flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-[#FF5A1F] via-[#F97316] to-[#F59E0B] text-white shadow-sm shadow-orange-500/30 ring-2 ring-orange-200/70">
+            <ChefHat className="w-4 h-4 stroke-[2.4]" />
+            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-white" />
+          </span>
+
+          <span className="relative z-10 font-display text-xl sm:text-2xl font-extrabold tracking-tight flex items-center">
+            <span className="text-slate-900">Snap</span>
+            <span className="snapchef-chef-gradient">Chef</span>
           </span>
         </a>
 
