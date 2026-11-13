@@ -1,13 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Camera,
   ChefHat,
-  Users,
-  Flame,
   Volume2,
   VolumeX,
   CheckCircle2,
-  HelpCircle,
+  Check,
 } from 'lucide-react';
 import type {
   CapturedIngredientPhoto,
@@ -47,10 +44,17 @@ const STORAGE_KEYS = {
   RECIPES: 'snapchef_synthesized_recipes_v2',
   SERVINGS: 'snapchef_servings_v2',
   DIET: 'snapchef_diet_v2',
-  SOUND: 'snapchef_relaxing_sound_v2',
+  READ_ALOUD: 'snapchef_read_aloud_v2',
 };
 
 type WizardStep = 'photos' | 'preferences' | 'recipes' | 'cooking';
+
+const STEP_ITEMS: Array<{ id: WizardStep; num: number; label: string }> = [
+  { id: 'photos', num: 1, label: '1. Ingredients' },
+  { id: 'preferences', num: 2, label: '2. Servings' },
+  { id: 'recipes', num: 3, label: '3. Recipes' },
+  { id: 'cooking', num: 4, label: '4. Cook' },
+];
 
 export default function App() {
   const [photos, setPhotos] = useState<CapturedIngredientPhoto[]>(() => {
@@ -102,14 +106,14 @@ export default function App() {
     return POTATO_SPICES_BUTTER_RECIPES;
   });
 
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+  const [readAloudEnabled, setReadAloudEnabled] = useState<boolean>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEYS.SOUND);
+      const saved = localStorage.getItem(STORAGE_KEYS.READ_ALOUD);
       if (saved !== null) return saved === 'true';
     } catch {
       // Ignore
     }
-    return true;
+    return false;
   });
 
   const [activeStep, setActiveStep] = useState<WizardStep>('photos');
@@ -132,6 +136,38 @@ export default function App() {
     return acc.length > 0 ? acc : INITIAL_INVENTORY.slice(0, 3);
   }, [photos]);
 
+  const speakHandsFree = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      // Ignore speech synthesis errors in restricted environments
+    }
+  }, []);
+
+  const buildStepAnnouncement = useCallback(
+    (step: WizardStep): string => {
+      if (step === 'photos') {
+        return `Step 1: Ingredients. You have ${photos.length} ingredient photos in your tray. Snap or upload photos of your ingredients, then press Next.`;
+      }
+      if (step === 'preferences') {
+        return `Step 2: Servings. Choose how many people you are cooking for, currently ${servings} people, and pick any dietary restrictions.`;
+      }
+      if (step === 'recipes') {
+        return `Step 3: Recipes. Showing ${recipes.length} recommended recipes for ${servings} people, including any lacking vegetables or spices.`;
+      }
+      const firstInstruction =
+        activeCraftingRecipe.steps[0]?.instruction ||
+        'Follow the step-by-step instructions.';
+      return `Step 4: Cook ${activeCraftingRecipe.title}. Step 1: ${firstInstruction}`;
+    },
+    [photos.length, servings, recipes.length, activeCraftingRecipe]
+  );
+
   // Global relaxing click sound listener for all buttons
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -139,12 +175,12 @@ export default function App() {
       if (!target) return;
       const button = target.closest('button, a');
       if (button) {
-        playRelaxingClickSound('soft', soundEnabled);
+        playRelaxingClickSound('soft', true);
       }
     };
     document.addEventListener('click', handleGlobalClick);
     return () => document.removeEventListener('click', handleGlobalClick);
-  }, [soundEnabled]);
+  }, []);
 
   // Persist user state
   useEffect(() => {
@@ -167,11 +203,11 @@ export default function App() {
     try {
       localStorage.setItem(STORAGE_KEYS.SERVINGS, String(servings));
       localStorage.setItem(STORAGE_KEYS.DIET, dietaryRestriction);
-      localStorage.setItem(STORAGE_KEYS.SOUND, String(soundEnabled));
+      localStorage.setItem(STORAGE_KEYS.READ_ALOUD, String(readAloudEnabled));
     } catch {
       // Ignore
     }
-  }, [servings, dietaryRestriction, soundEnabled]);
+  }, [servings, dietaryRestriction, readAloudEnabled]);
 
   const showToast = (msg: string) => {
     setStatusToast(msg);
@@ -181,9 +217,35 @@ export default function App() {
   };
 
   const goToStep = (step: WizardStep) => {
-    playRelaxingClickSound('step', soundEnabled);
+    playRelaxingClickSound('step', true);
     setActiveStep(step);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (readAloudEnabled) {
+      speakHandsFree(buildStepAnnouncement(step));
+    }
+  };
+
+  const handleToggleReadAloud = () => {
+    setReadAloudEnabled((prev) => {
+      const next = !prev;
+      if (next) {
+        speakHandsFree(
+          `Read Aloud enabled for hands-free kitchen use. ${buildStepAnnouncement(
+            activeStep
+          )}`
+        );
+      } else if (
+        typeof window !== 'undefined' &&
+        'speechSynthesis' in window
+      ) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // Ignore
+        }
+      }
+      return next;
+    });
   };
 
   const handleAddPhotoToTray = (
@@ -201,6 +263,26 @@ export default function App() {
       const filtered = prev.filter((p) => p.id !== photoId);
       return filtered.length > 0 ? filtered : prev;
     });
+  };
+
+  const handleAdjustPhotoQuantity = (photoId: string, deltaGrams: number) => {
+    setPhotos((prev) =>
+      prev.map((photo) => {
+        if (photo.id !== photoId) return photo;
+        const updatedItems = photo.detectedItems.map((item, idx) => {
+          if (idx !== 0) return item;
+          const nextQty = Math.max(50, (item.quantity_g || 200) + deltaGrams);
+          return {
+            ...item,
+            quantity_g: nextQty,
+          };
+        });
+        return {
+          ...photo,
+          detectedItems: updatedItems,
+        };
+      })
+    );
   };
 
   const handleLoadPresetPhotos = (presetId: string) => {
@@ -227,7 +309,7 @@ export default function App() {
     setPhotos(newTray);
     setRecipes(preset.payload.recipes);
     showToast(
-      `Loaded ${newTray.length} ingredient photos (${preset.label})! Click "Next: Choose How Many People & Diet" to continue.`
+      `Loaded ${newTray.length} ingredient photos (${preset.label})! Click "2. Servings" or Next to continue.`
     );
   };
 
@@ -256,7 +338,7 @@ export default function App() {
           setRecipes(scaled);
           setActiveCraftingRecipe(scaled[0]);
           setIsSynthesizingStep2(false);
-          playRelaxingClickSound('success', soundEnabled);
+          playRelaxingClickSound('success', true);
           goToStep('recipes');
           return;
         }
@@ -273,7 +355,7 @@ export default function App() {
       setActiveCraftingRecipe(scaledFallback[0]);
     }
     setIsSynthesizingStep2(false);
-    playRelaxingClickSound('success', soundEnabled);
+    playRelaxingClickSound('success', true);
     goToStep('recipes');
   };
 
@@ -305,7 +387,7 @@ export default function App() {
       consumedIngredients:
         consumedNames.length > 0 ? consumedNames : recipe.used_ingredients,
     };
-    playRelaxingClickSound('success', soundEnabled);
+    playRelaxingClickSound('success', true);
     showToast(
       `Finished cooking "${completedLog.title}" for ${servings} ${
         servings === 1 ? 'Person' : 'People'
@@ -313,250 +395,130 @@ export default function App() {
     );
   };
 
+  const activeStepOrder =
+    STEP_ITEMS.find((s) => s.id === activeStep)?.num || 1;
+
   return (
     <div
       id="top"
-      className="min-h-screen bg-gradient-to-br from-[#FFFDF9] via-[#FFF7ED] to-[#F0FDFA] text-slate-900 pb-24 md:pb-16"
+      className="min-h-screen bg-gradient-to-br from-[#FFFDF9] via-[#FFF7ED] to-[#F0FDFA] text-slate-900 pb-16"
     >
-      {/* Clean, Simple Top Bar — Responsive across Mobile, iPad/Tablet, and Desktop */}
-      <header className="sticky top-0 z-40 min-h-16 py-2 flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 lg:px-8 bg-white/95 backdrop-blur-md border-b border-orange-200/80 shadow-xs">
-        {/* Brand Wordmark */}
-        <button
-          type="button"
-          onClick={() => goToStep('photos')}
-          className="snapchef-logo-shell group relative inline-flex items-center gap-2 sm:gap-2.5 px-3 sm:px-3.5 py-1.5 rounded-2xl bg-gradient-to-r from-[#FFF7ED] via-white to-[#ECFDF5] border border-orange-200/90 whitespace-nowrap shrink-0 overflow-hidden transition-transform hover:scale-[1.02] cursor-pointer"
-        >
-          <svg
-            aria-hidden="true"
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox="0 0 190 46"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient
-                id="snapchef-warm-neon-grad"
-                x1="0%"
-                y1="0%"
-                x2="100%"
-                y2="100%"
-              >
-                <stop offset="0%" stopColor="#FF5A1F" />
-                <stop offset="40%" stopColor="#F59E0B" />
-                <stop offset="75%" stopColor="#10B981" />
-                <stop offset="100%" stopColor="#FF5A1F" />
-              </linearGradient>
-            </defs>
-            <rect
-              x="1.5"
-              y="1.5"
-              width="187"
-              height="43"
-              rx="14"
-              fill="none"
-              stroke="url(#snapchef-warm-neon-grad)"
-              strokeWidth="2.5"
-              className="snapchef-neon-rect"
-            />
-          </svg>
-
-          <span className="relative z-10 flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-gradient-to-br from-[#FF5A1F] via-[#F97316] to-[#F59E0B] text-white shadow-xs shrink-0">
-            <ChefHat className="w-4 h-4 stroke-[2.4]" />
-          </span>
-
-          <span className="relative z-10 font-display text-lg sm:text-xl lg:text-2xl font-extrabold tracking-tight flex items-center">
-            <span className="text-slate-900">Snap</span>
-            <span className="snapchef-chef-gradient">Chef</span>
-          </span>
-        </button>
-
-        {/* Simple 4-Step Menu Navigation — Never wraps or overlaps on iPad/Tablet or Desktop */}
-        <nav
-          aria-label="Simple Step Navigation"
-          className="hidden md:flex items-center gap-1 lg:gap-3 xl:gap-5 text-xs lg:text-sm font-bold text-slate-600 shrink-0"
-        >
+      {/* Single, Sticky Top Bar: Logo + 4-Step Progress Indicator + Read Aloud Toggle + Install App */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-orange-200/80 shadow-xs">
+        <div className="max-w-6xl mx-auto px-3 md:px-4 lg:px-8 py-2 flex flex-wrap md:flex-nowrap items-center justify-between gap-2">
+          {/* 1. Brand Logo */}
           <button
             type="button"
             onClick={() => goToStep('photos')}
-            className={`px-2.5 py-1.5 rounded-xl whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-              activeStep === 'photos'
-                ? 'text-[#FF5A1F] bg-orange-50/90 border border-orange-200/80 shadow-2xs'
-                : 'hover:text-[#FF5A1F] hover:bg-orange-50/40'
-            }`}
+            className="snapchef-logo-shell group relative inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-2xl bg-gradient-to-r from-[#FFF7ED] via-white to-[#ECFDF5] border border-orange-200/90 whitespace-nowrap shrink-0 overflow-hidden transition-transform hover:scale-[1.02] cursor-pointer"
           >
-            <span className="xl:hidden">1. Photos ({photos.length})</span>
-            <span className="hidden xl:inline">
-              1. Add Photos ({photos.length})
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToStep('preferences')}
-            className={`px-2.5 py-1.5 rounded-xl whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-              activeStep === 'preferences'
-                ? 'text-[#FF5A1F] bg-orange-50/90 border border-orange-200/80 shadow-2xs'
-                : 'hover:text-[#FF5A1F] hover:bg-orange-50/40'
-            }`}
-          >
-            <span className="lg:hidden">2. People ({servings})</span>
-            <span className="hidden lg:inline">
-              2. People &amp; Diet ({servings})
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToStep('recipes')}
-            className={`px-2.5 py-1.5 rounded-xl whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-              activeStep === 'recipes'
-                ? 'text-[#FF5A1F] bg-orange-50/90 border border-orange-200/80 shadow-2xs'
-                : 'hover:text-[#FF5A1F] hover:bg-orange-50/40'
-            }`}
-          >
-            <span className="xl:hidden">3. Recipes ({recipes.length})</span>
-            <span className="hidden xl:inline">
-              3. Recipes &amp; Missing Items
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={() => goToStep('cooking')}
-            className={`px-2.5 py-1.5 rounded-xl whitespace-nowrap shrink-0 transition-all cursor-pointer ${
-              activeStep === 'cooking'
-                ? 'text-[#FF5A1F] bg-orange-50/90 border border-orange-200/80 shadow-2xs'
-                : 'hover:text-[#FF5A1F] hover:bg-orange-50/40'
-            }`}
-          >
-            <span className="xl:hidden">4. Cook</span>
-            <span className="hidden xl:inline">4. Cooking Guide</span>
-          </button>
-        </nav>
+            <svg
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full pointer-events-none"
+              viewBox="0 0 190 46"
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient
+                  id="snapchef-warm-neon-grad"
+                  x1="0%"
+                  y1="0%"
+                  x2="100%"
+                  y2="100%"
+                >
+                  <stop offset="0%" stopColor="#FF5A1F" />
+                  <stop offset="40%" stopColor="#F59E0B" />
+                  <stop offset="75%" stopColor="#10B981" />
+                  <stop offset="100%" stopColor="#FF5A1F" />
+                </linearGradient>
+              </defs>
+              <rect
+                x="1.5"
+                y="1.5"
+                width="187"
+                height="43"
+                rx="14"
+                fill="none"
+                stroke="url(#snapchef-warm-neon-grad)"
+                strokeWidth="2.5"
+                className="snapchef-neon-rect"
+              />
+            </svg>
 
-        {/* Right Actions: Relaxing Click Sound Toggle + Install App */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setSoundEnabled((prev) => !prev)}
-            className="min-h-[38px] sm:min-h-[40px] px-2.5 sm:px-3 py-1.5 rounded-xl border border-orange-200 bg-orange-50/70 hover:bg-orange-100 text-xs font-bold text-slate-700 flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
-            aria-label={
-              soundEnabled
-                ? 'Mute relaxing button click sound'
-                : 'Enable relaxing button click sound'
-            }
-          >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-[#FF5A1F] shrink-0" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-slate-400 shrink-0" />
-            )}
-            <span className="hidden lg:inline">
-              Sound: {soundEnabled ? 'On' : 'Off'}
+            <span className="relative z-10 flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-gradient-to-br from-[#FF5A1F] via-[#F97316] to-[#F59E0B] text-white shadow-xs shrink-0">
+              <ChefHat className="w-3.5 h-3.5 sm:w-4 sm:h-4 stroke-[2.4]" />
+            </span>
+
+            <span className="relative z-10 font-display text-base sm:text-lg lg:text-xl font-extrabold tracking-tight flex items-center">
+              <span className="text-slate-900">Snap</span>
+              <span className="snapchef-chef-gradient">Chef</span>
             </span>
           </button>
-          <PWAInstallModalTrigger variant="compact" />
+
+          {/* 2. 4-Step Progress Indicator (1. Ingredients, 2. Servings, 3. Recipes, 4. Cook) */}
+          <nav
+            aria-label="4-Step Progress Indicator"
+            className="order-3 md:order-2 w-full md:w-auto grid grid-cols-4 md:flex items-center gap-1 lg:gap-1.5 bg-orange-50/70 border border-orange-200/80 p-1 rounded-2xl shrink-0"
+          >
+            {STEP_ITEMS.map((step) => {
+              const isCurrent = activeStep === step.id;
+              const isCompleted = step.num < activeStepOrder;
+
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => goToStep(step.id)}
+                  aria-current={isCurrent ? 'step' : undefined}
+                  className={`min-h-[34px] sm:min-h-[36px] px-1.5 sm:px-2.5 lg:px-3.5 py-1 sm:py-1.5 rounded-xl text-[11px] sm:text-xs lg:text-sm font-extrabold whitespace-nowrap shrink-0 flex items-center justify-center gap-1 transition-all cursor-pointer ${
+                    isCurrent
+                      ? 'bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white shadow-sm'
+                      : isCompleted
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100/70'
+                      : 'text-slate-700 hover:text-[#FF5A1F] hover:bg-white/80'
+                  }`}
+                >
+                  {isCompleted && (
+                    <Check className="w-3 h-3 text-emerald-600 shrink-0 hidden lg:inline" />
+                  )}
+                  <span>{step.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* 3. 'Read Aloud' Speaker Toggle + 4. 'Install App' Button */}
+          <div className="order-2 md:order-3 flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleToggleReadAloud}
+              aria-pressed={readAloudEnabled}
+              aria-label="Read Aloud speaker toggle for hands-free use"
+              className={`min-h-[34px] sm:min-h-[38px] px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shrink-0 transition-all cursor-pointer ${
+                readAloudEnabled
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-2xs'
+                  : 'border-orange-200 bg-orange-50/70 hover:bg-orange-100 text-slate-700'
+              }`}
+            >
+              {readAloudEnabled ? (
+                <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#FF5A1F] shrink-0" />
+              )}
+              <span>Read Aloud</span>
+            </button>
+            <PWAInstallModalTrigger variant="compact" />
+          </div>
         </div>
       </header>
 
-      {/* Main Content Container */}
-      <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-        {/* Beginner-Friendly Purpose & "How SnapChef Helps You" Banner */}
-        <section
-          aria-label="What is SnapChef and How to Use It"
-          className="rounded-3xl border-2 border-orange-200/80 bg-gradient-to-r from-orange-50 via-amber-50/70 to-emerald-50/70 p-4 sm:p-6 lg:p-7 shadow-xs"
-        >
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-2 text-xs font-extrabold text-[#FF5A1F] uppercase tracking-wide">
-              <HelpCircle className="w-4 h-4 shrink-0" />
-              <span>Welcome to SnapChef · Simple Kitchen Guide for Beginners</span>
-            </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 mt-1.5 leading-tight">
-              Turn Photos of Your Kitchen Ingredients into Easy Home-Cooked Meals
-            </h1>
-            <p className="text-xs sm:text-sm lg:text-base text-slate-700 mt-2 leading-relaxed">
-              <strong>Purpose of this app:</strong> SnapChef helps anyone figure
-              out what to cook when staring at random vegetables and spices in
-              the kitchen. Just upload photos of each ingredient you have, tell
-              us how many people you&apos;re cooking for and your diet, and we
-              recommend delicious recipes—while clearly listing{' '}
-              <strong>which extra vegetables or spices are lacking</strong> to
-              complete each dish.
-            </p>
-          </div>
-
-          {/* Interactive 3-Step Beginner Progress Bar */}
-          <div className="mt-4 sm:mt-5 pt-4 border-t border-orange-200/60 grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
-            <button
-              type="button"
-              onClick={() => goToStep('photos')}
-              className={`rounded-2xl border p-3 sm:p-3.5 text-left transition-all flex items-start gap-3 min-w-0 cursor-pointer ${
-                activeStep === 'photos'
-                  ? 'border-[#FF5A1F] bg-white shadow-sm'
-                  : 'border-orange-200/70 bg-white/70 hover:bg-white'
-              }`}
-            >
-              <span className="w-7 h-7 rounded-lg bg-[#FF5A1F] text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                1
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug">
-                  Add Ingredient Photos
-                </p>
-                <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                  Snap or upload multiple photos ({photos.length} added)
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goToStep('preferences')}
-              className={`rounded-2xl border p-3 sm:p-3.5 text-left transition-all flex items-start gap-3 min-w-0 cursor-pointer ${
-                activeStep === 'preferences'
-                  ? 'border-[#FF5A1F] bg-white shadow-sm'
-                  : 'border-orange-200/70 bg-white/70 hover:bg-white'
-              }`}
-            >
-              <span className="w-7 h-7 rounded-lg bg-amber-500 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                2
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug">
-                  People Count &amp; Diet
-                </p>
-                <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                  {servings} {servings === 1 ? 'Person' : 'People'} ·{' '}
-                  {dietaryRestriction}
-                </p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => goToStep('recipes')}
-              className={`rounded-2xl border p-3 sm:p-3.5 text-left transition-all flex items-start gap-3 min-w-0 cursor-pointer ${
-                activeStep === 'recipes' || activeStep === 'cooking'
-                  ? 'border-[#FF5A1F] bg-white shadow-sm'
-                  : 'border-orange-200/70 bg-white/70 hover:bg-white'
-              }`}
-            >
-              <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center shrink-0">
-                3
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs sm:text-sm font-extrabold text-slate-900 leading-snug">
-                  Recipes &amp; Lacking Items
-                </p>
-                <p className="text-xs text-slate-600 mt-0.5 leading-snug">
-                  {recipes.length} dishes + missing veg &amp; spices
-                </p>
-              </div>
-            </button>
-          </div>
-        </section>
-
+      {/* Main Content Container — Starts directly with the active step to save space */}
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 pt-5 sm:pt-6">
         {/* Optional Status Toast */}
         {statusToast && (
           <div
             role="status"
-            className="mt-4 rounded-2xl border border-emerald-400 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-bold text-emerald-900 flex items-center justify-between gap-3"
+            className="mb-4 rounded-2xl border border-emerald-400 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-bold text-emerald-900 flex items-center justify-between gap-3"
           >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -572,13 +534,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Active Step View — Only 1 focused step visible at a time so beginners are never confused */}
-        <div className="mt-6">
+        {/* Active Step View */}
+        <div>
           {activeStep === 'photos' && (
             <CameraScannerEye
               photos={photos}
               onAddPhotoToTray={handleAddPhotoToTray}
               onRemovePhotoFromTray={handleRemovePhotoFromTray}
+              onAdjustPhotoQuantity={handleAdjustPhotoQuantity}
               onLoadPresetPhotos={handleLoadPresetPhotos}
               onProceedToServings={() => goToStep('preferences')}
             />
@@ -623,97 +586,7 @@ export default function App() {
         </div>
       </main>
 
-      {/* Simple Quiet Footer */}
-      <footer className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t border-orange-200/60 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
-        <p>
-          SnapChef — Simple Multi-Photo Ingredient Scanner & Recipe Guide
-        </p>
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={() => goToStep('photos')}
-            className="hover:text-[#FF5A1F] cursor-pointer"
-          >
-            1. Add Photos
-          </button>
-          <span aria-hidden="true">·</span>
-          <button
-            type="button"
-            onClick={() => goToStep('preferences')}
-            className="hover:text-[#FF5A1F] cursor-pointer"
-          >
-            2. People & Diet
-          </button>
-          <span aria-hidden="true">·</span>
-          <button
-            type="button"
-            onClick={() => goToStep('recipes')}
-            className="hover:text-[#FF5A1F] cursor-pointer"
-          >
-            3. Recipes
-          </button>
-        </div>
-      </footer>
-
       <OfflineIndicator />
-
-      {/* Mobile Bottom Navigation Bar */}
-      <nav
-        aria-label="Mobile Step Navigation"
-        className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-orange-200 grid grid-cols-4 items-center h-14 pb-safe px-1 shadow-lg"
-      >
-        <button
-          type="button"
-          onClick={() => goToStep('photos')}
-          className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeStep === 'photos'
-              ? 'text-[#FF5A1F] font-bold'
-              : 'text-slate-500'
-          }`}
-        >
-          <Camera className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">1. Photos</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => goToStep('preferences')}
-          className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeStep === 'preferences'
-              ? 'text-amber-600 font-bold'
-              : 'text-slate-500'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">2. People</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => goToStep('recipes')}
-          className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeStep === 'recipes'
-              ? 'text-emerald-600 font-bold'
-              : 'text-slate-500'
-          }`}
-        >
-          <ChefHat className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">3. Recipes</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => goToStep('cooking')}
-          className={`min-h-[44px] flex flex-col items-center justify-center cursor-pointer ${
-            activeStep === 'cooking'
-              ? 'text-rose-600 font-bold'
-              : 'text-slate-500'
-          }`}
-        >
-          <Flame className="w-4 h-4" />
-          <span className="text-[10px] mt-0.5">4. Cook</span>
-        </button>
-      </nav>
     </div>
   );
 }

@@ -26,11 +26,11 @@ export const PWAInstallModalTrigger: React.FC<{
         <button
           type="button"
           onClick={handleInstallClick}
-          className="min-h-[40px] px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] hover:opacity-95 text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
-          aria-label="Install SnapChef App on Phone or Desktop"
+          className="min-h-[34px] sm:min-h-[38px] px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] hover:opacity-95 text-[11px] sm:text-xs font-bold text-white shadow-md shadow-rose-500/20 transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+          aria-label="Install App"
         >
-          <Download className="w-3.5 h-3.5 text-white" />
-          <span>{isIOS ? 'Install on iOS' : 'Install App'}</span>
+          <Download className="w-3.5 h-3.5 text-white shrink-0" />
+          <span>Install App</span>
         </button>
       ) : (
         <div className="rounded-3xl border-2 border-teal-200 bg-gradient-to-r from-teal-50 via-emerald-50 to-cyan-50 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
