@@ -295,32 +295,32 @@ export const RecipeSynthesizer: React.FC<RecipeSynthesizerProps> = ({
           return (
             <article
               key={recipe.id}
-              className="rounded-2xl border-2 border-orange-200/80 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-5 flex flex-col justify-between shadow-sm hover:shadow-lg hover:border-[#FF5A1F] transition-all"
+              className="rounded-2xl border-2 border-orange-200/80 bg-gradient-to-br from-orange-50/40 via-white to-amber-50/30 p-4 sm:p-5 flex flex-col justify-between shadow-sm hover:shadow-lg hover:border-[#FF5A1F] transition-all min-w-0"
             >
               <div>
                 {/* Simple Top Metadata Row */}
-                <div className="flex items-center justify-between gap-2 text-xs text-slate-600">
-                  <div className="flex items-center gap-1.5 font-bold">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                  <div className="flex flex-wrap items-center gap-1.5 font-bold">
                     <span className="text-[#EA580C]">{recipe.meal_type}</span>
                     <span aria-hidden="true">·</span>
                     <span className="text-slate-800">{recipe.cuisine}</span>
                     <span aria-hidden="true">·</span>
-                    <span className="text-emerald-700">
+                    <span className="text-emerald-700 whitespace-nowrap">
                       Serves {servings} {servings === 1 ? 'Person' : 'People'}
                     </span>
                   </div>
-                  <span className="font-mono font-bold text-slate-800 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5 text-[#FF5A1F]" />
+                  <span className="font-mono font-bold text-slate-800 flex items-center gap-1 whitespace-nowrap shrink-0">
+                    <Clock className="w-3.5 h-3.5 text-[#FF5A1F] shrink-0" />
                     {recipe.prep_cook_minutes} mins
                   </span>
                 </div>
 
                 {/* Dish Title */}
-                <h3 className="text-lg font-extrabold text-slate-900 mt-2">
+                <h3 className="text-base sm:text-lg font-extrabold text-slate-900 mt-2 leading-snug">
                   {recipe.title}
                 </h3>
 
-                <p className="text-xs text-slate-600 mt-1">
+                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
                   {recipe.chef_note}
                 </p>
 
@@ -330,7 +330,7 @@ export const RecipeSynthesizer: React.FC<RecipeSynthesizerProps> = ({
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>Ingredients You Have (From Your Photos):</span>
                   </div>
-                  <p className="text-xs font-semibold text-emerald-950 mt-1">
+                  <p className="text-xs font-semibold text-emerald-950 mt-1 leading-relaxed">
                     {haveIngredients.join(' · ')}
                   </p>
                 </div>
@@ -343,7 +343,7 @@ export const RecipeSynthesizer: React.FC<RecipeSynthesizerProps> = ({
                       Other Vegetables / Fresh Items Lacking for This Dish:
                     </span>
                   </div>
-                  <p className="text-xs text-slate-800 mt-1">
+                  <p className="text-xs text-slate-800 mt-1 leading-relaxed">
                     {missingVegetables.join(' · ')}
                   </p>
                 </div>
@@ -356,21 +356,21 @@ export const RecipeSynthesizer: React.FC<RecipeSynthesizerProps> = ({
                       Other Spices / Seasonings Lacking for This Dish:
                     </span>
                   </div>
-                  <p className="text-xs text-slate-800 mt-1">
+                  <p className="text-xs text-slate-800 mt-1 leading-relaxed">
                     {missingSpices.join(' · ')}
                   </p>
                 </div>
               </div>
 
               {/* Footer: Calories & Cook Button */}
-              <div className="mt-5 pt-4 border-t border-slate-200/80 flex items-center justify-between gap-3">
-                <div className="text-xs font-mono font-bold text-slate-700 flex items-center gap-2">
-                  <span className="flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5 text-[#FF5A1F]" />
+              <div className="mt-5 pt-4 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-xs font-mono font-bold text-slate-700 flex flex-wrap items-center gap-2">
+                  <span className="flex items-center gap-1 whitespace-nowrap">
+                    <Flame className="w-3.5 h-3.5 text-[#FF5A1F] shrink-0" />
                     {recipe.total_calories} kcal/serving
                   </span>
                   <span aria-hidden="true">·</span>
-                  <span className="text-emerald-700">
+                  <span className="text-emerald-700 whitespace-nowrap">
                     {recipe.protein_g}g Protein
                   </span>
                 </div>
@@ -378,9 +378,9 @@ export const RecipeSynthesizer: React.FC<RecipeSynthesizerProps> = ({
                 <button
                   type="button"
                   onClick={() => onSelectRecipeForCrafting(recipe)}
-                  className="min-h-[44px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 transition-all shadow-md shadow-rose-500/20 flex items-center gap-2 shrink-0 cursor-pointer"
+                  className="min-h-[42px] px-4 sm:px-5 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 transition-all shadow-md shadow-rose-500/20 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <Play className="w-3.5 h-3.5 fill-current shrink-0" />
                   <span>Cook This Recipe →</span>
                 </button>
               </div>

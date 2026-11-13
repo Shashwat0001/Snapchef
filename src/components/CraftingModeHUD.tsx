@@ -342,20 +342,20 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
             </div>
 
             {/* Step Navigation Buttons */}
-            <div className="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between gap-3">
+            <div className="mt-6 pt-4 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
               <button
                 type="button"
                 disabled={activeStepIndex === 0}
                 onClick={() =>
                   setActiveStepIndex((prev) => Math.max(0, prev - 1))
                 }
-                className="min-h-[44px] px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 hover:bg-slate-100 disabled:opacity-40 transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="min-h-[42px] px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 hover:bg-slate-100 disabled:opacity-40 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <ChevronLeft className="w-4 h-4" />
+                <ChevronLeft className="w-4 h-4 shrink-0" />
                 <span>Previous Step</span>
               </button>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {recipe.steps.map((_, idx) => (
                   <button
                     key={idx}
@@ -387,19 +387,19 @@ export const CraftingModeHUD: React.FC<CraftingModeHUDProps> = ({
                       Math.min(totalSteps - 1, prev + 1)
                     );
                   }}
-                  className="min-h-[44px] px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-bold text-xs hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-bold text-xs hover:opacity-95 transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <span>Next Step</span>
-                  <ChevronRight className="w-4 h-4" />
+                  <ChevronRight className="w-4 h-4 shrink-0" />
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleFinishDish}
-                  className="min-h-[44px] px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs sm:text-sm hover:opacity-95 transition-all flex items-center gap-2 cursor-pointer shadow-md shadow-emerald-500/20"
+                  className="min-h-[42px] px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-xs sm:text-sm hover:opacity-95 transition-all flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer shadow-md shadow-emerald-500/20"
                 >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Complete Dish & Update Pantry</span>
+                  <Sparkles className="w-4 h-4 shrink-0" />
+                  <span>Complete Dish &amp; Update Pantry</span>
                 </button>
               )}
             </div>

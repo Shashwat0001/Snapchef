@@ -493,15 +493,15 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
       className="rounded-3xl border-2 border-orange-200/90 bg-white p-5 sm:p-7 shadow-xl shadow-orange-500/5"
     >
       {/* Clean Beginner Step Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-orange-100">
-        <div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 pb-5 border-b border-orange-100">
+        <div className="min-w-0">
           <p className="text-xs font-extrabold text-[#FF5A1F] uppercase tracking-wide">
             Step 1 of 3 · Add All Your Ingredients
           </p>
-          <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 mt-1">
+          <h2 className="text-lg sm:text-xl lg:text-2xl font-extrabold text-slate-900 mt-1 leading-snug">
             Click or Upload Photos of Each Ingredient You Have
           </h2>
-          <p className="text-sm text-slate-600 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
             Since you can&apos;t fit every kitchen ingredient in a single frame,
             add <strong>as many photos as you want</strong> below—one photo per
             ingredient or group of items!
@@ -511,17 +511,17 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         <button
           type="button"
           onClick={onProceedToServings}
-          className="min-h-[48px] px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 transition-all shadow-md shadow-orange-500/20 flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+          className="min-h-[46px] px-4 sm:px-5 py-2.5 rounded-2xl bg-gradient-to-r from-[#FF5A1F] to-[#FF2E63] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 self-start md:self-auto cursor-pointer"
         >
-          <span>Next: Servings & Diet ({photos.length} Photos)</span>
-          <ArrowRight className="w-4 h-4" />
+          <span>Next: Servings &amp; Diet ({photos.length} Photos)</span>
+          <ArrowRight className="w-4 h-4 shrink-0" />
         </button>
       </div>
 
       {/* Main 2-Column Layout: Left = Simple Camera/Upload Box, Right = Multi-Photo Tray */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left 6 Columns: Uncluttered Camera Lens + 2 Big Action Buttons */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
+        <div className="lg:col-span-6 flex flex-col gap-4 min-w-0">
           <div className="rounded-2xl overflow-hidden border-2 border-teal-400/70 bg-slate-900 relative min-h-[260px] sm:min-h-[300px] flex flex-col justify-between shadow-md">
             <video
               ref={videoRef}
@@ -547,20 +547,20 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
             )}
 
             {/* Simple Unobstructed Viewfinder Frame */}
-            <div className="relative z-20 flex flex-col justify-between h-full p-4 pointer-events-none">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-mono font-semibold text-teal-300 bg-slate-950/80 px-3 py-1 rounded-lg border border-teal-400/30">
+            <div className="relative z-20 flex flex-col justify-between h-full p-3.5 sm:p-4 pointer-events-none">
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <span className="text-[11px] sm:text-xs font-mono font-semibold text-teal-300 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-teal-400/30 whitespace-nowrap">
                   {cameraState === 'live'
                     ? 'LIVE CAMERA ACTIVE'
                     : 'CAMERA / PHOTO UPLOADER'}
                 </span>
-                <span className="text-xs font-mono font-semibold text-amber-300 bg-slate-950/80 px-3 py-1 rounded-lg border border-amber-400/30">
+                <span className="text-[11px] sm:text-xs font-mono font-semibold text-amber-300 bg-slate-950/80 px-2.5 py-1 rounded-lg border border-amber-400/30 whitespace-nowrap">
                   {photos.length} {photos.length === 1 ? 'PHOTO' : 'PHOTOS'} IN TRAY
                 </span>
               </div>
 
               {/* Transparent Corner Reticle */}
-              <div className="my-auto mx-auto w-64 h-32 sm:w-72 sm:h-36 relative rounded-2xl border border-teal-300/60 bg-transparent flex flex-col items-center justify-center text-center px-4">
+              <div className="my-4 mx-auto w-full max-w-[260px] sm:max-w-[290px] min-h-[120px] sm:min-h-[136px] relative rounded-2xl border border-teal-300/60 bg-transparent flex flex-col items-center justify-center text-center px-4 py-3">
                 <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-3 border-l-3 border-teal-300 rounded-tl-lg" />
                 <div className="absolute -top-0.5 -right-0.5 w-6 h-6 border-t-3 border-r-3 border-teal-300 rounded-tr-lg" />
                 <div className="absolute -bottom-0.5 -left-0.5 w-6 h-6 border-b-3 border-l-3 border-teal-300 rounded-bl-lg" />
@@ -578,7 +578,7 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                 )}
               </div>
 
-              <div className="bg-slate-950/85 -mx-4 -mb-4 px-4 py-2.5">
+              <div className="bg-slate-950/85 -mx-3.5 sm:-mx-4 -mb-3.5 sm:-mb-4 px-3.5 sm:px-4 py-2.5">
                 <p className="text-xs text-white truncate">{scanStatusText}</p>
               </div>
             </div>
@@ -590,9 +590,9 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                   type="button"
                   onClick={handleSnapPhotoToTray}
                   disabled={isScanning}
-                  className="min-h-[46px] px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#F59E0B] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 active:scale-[0.99] disabled:opacity-60 transition-all shadow-md flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-3.5 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF5A1F] to-[#F59E0B] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 active:scale-[0.99] disabled:opacity-60 transition-all shadow-md flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  <Camera className="w-4 h-4" />
+                  <Camera className="w-4 h-4 shrink-0" />
                   <span>
                     {isScanning ? 'Adding Photo...' : 'Snap Ingredient Photo'}
                   </span>
@@ -602,9 +602,9 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={isScanning}
-                  className="min-h-[46px] px-4 py-2.5 rounded-xl border border-teal-400/60 bg-slate-900 text-white hover:bg-slate-800 text-xs sm:text-sm font-bold transition-colors flex items-center gap-2 cursor-pointer"
+                  className="min-h-[44px] px-3.5 sm:px-4 py-2 rounded-xl border border-teal-400/60 bg-slate-900 text-white hover:bg-slate-800 text-xs sm:text-sm font-bold transition-colors flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  <Upload className="w-4 h-4 text-teal-300" />
+                  <Upload className="w-4 h-4 text-teal-300 shrink-0" />
                   <span>Upload Multiple Photos</span>
                 </button>
 
@@ -702,17 +702,17 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
         </div>
 
         {/* Right 6 Columns: Multi-Photo Ingredient Tray + Focused Ingredient Qualities */}
-        <div className="lg:col-span-6 flex flex-col gap-4">
+        <div className="lg:col-span-6 flex flex-col gap-4 min-w-0">
           <div className="rounded-2xl border-2 border-orange-200/80 bg-orange-50/40 p-4 sm:p-5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Images className="w-5 h-5 text-[#FF5A1F]" />
-                <h3 className="text-base font-extrabold text-slate-900">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <Images className="w-5 h-5 text-[#FF5A1F] shrink-0" />
+                <h3 className="text-sm sm:text-base font-extrabold text-slate-900">
                   Your Ingredient Photo Tray ({photos.length}{' '}
                   {photos.length === 1 ? 'Photo' : 'Photos'})
                 </h3>
               </div>
-              <span className="text-xs font-semibold text-emerald-700">
+              <span className="text-xs font-semibold text-emerald-700 whitespace-nowrap">
                 Add as many photos as you need
               </span>
             </div>
@@ -725,7 +725,7 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
                 return (
                   <div
                     key={photo.id}
-                    className={`rounded-2xl border-2 bg-white p-3 flex items-center justify-between gap-3 transition-all ${
+                    className={`rounded-2xl border-2 bg-white p-3 flex items-center justify-between gap-3 transition-all min-w-0 ${
                       isSelected
                         ? 'border-[#FF5A1F] shadow-md shadow-orange-500/10'
                         : 'border-slate-200 hover:border-orange-300'
@@ -775,20 +775,20 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
             {/* Hold-Still / Selected Ingredient Specific Qualities Box */}
             {inspectedItem && (
               <div className="mt-4 rounded-2xl border border-teal-200 bg-white p-4">
-                <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                   <span className="text-xs font-extrabold text-teal-800">
                     Ingredient Qualities: {inspectedItem.name}
                   </span>
-                  <span className="text-[11px] font-mono font-bold text-slate-600">
+                  <span className="text-[11px] font-mono font-bold text-slate-600 whitespace-nowrap">
                     P {inspectedItem.macros.protein_g}g · C{' '}
                     {inspectedItem.macros.carbs_g}g · F{' '}
                     {inspectedItem.macros.fat_g}g
                   </span>
                 </div>
-                <div className="mt-2.5 space-y-1.5 text-xs text-slate-700">
+                <div className="mt-2.5 space-y-1.5 text-xs text-slate-700 leading-relaxed">
                   <p>
                     <strong className="text-emerald-800">
-                      Texture & Freshness:
+                      Texture &amp; Freshness:
                     </strong>{' '}
                     {inspectedItem.qualities?.texture_and_freshness}
                   </p>
@@ -820,11 +820,11 @@ export const CameraScannerEye: React.FC<CameraScannerEyeProps> = ({
               <button
                 type="button"
                 onClick={onProceedToServings}
-                className="min-h-[50px] px-6 py-3 rounded-2xl bg-gradient-to-r from-[#FF5A1F] via-[#FF2E63] to-[#F59E0B] text-white font-extrabold text-sm hover:opacity-95 active:scale-[0.99] transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 cursor-pointer"
+                className="min-h-[48px] px-5 sm:px-6 py-3 rounded-2xl bg-gradient-to-r from-[#FF5A1F] via-[#FF2E63] to-[#F59E0B] text-white font-extrabold text-xs sm:text-sm hover:opacity-95 active:scale-[0.99] transition-all shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Next: Choose How Many People & Diet</span>
-                <ArrowRight className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 shrink-0" />
+                <span>Next: Choose How Many People &amp; Diet</span>
+                <ArrowRight className="w-4 h-4 shrink-0" />
               </button>
             </div>
           </div>
